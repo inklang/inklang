@@ -17,7 +17,7 @@ export default abstract class Expr {
 
   public static readonly Literal = class Literal extends Expr {
     public constructor (
-      public readonly value: string | number | null,
+      public readonly value: string | number | boolean | null,
     ) { super() }
   }
 
