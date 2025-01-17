@@ -37,9 +37,11 @@ export enum TokenType {
   FALSE,
   TRUE,
   VAR,
+  FOR,
   WHILE,
   OR,
   RETURN,
+  FUNCTION,
 
   EOF
 }
@@ -48,11 +50,7 @@ export class Token {
   public constructor (
     public readonly type: TokenType,
     public readonly lexeme: string,
-    public readonly literal: string | null,
+    public readonly literal: string | number | null,
     public readonly line: number
   ) {}
-
-  public toString (): string {
-    return `${this.type} ${this.lexeme} ${this.literal}`;
-  }
 }

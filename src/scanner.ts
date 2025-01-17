@@ -3,6 +3,31 @@ import { Token, TokenType } from "./token";
 export class Scanner {
   public constructor (private readonly source: string) {}
 
+  private readonly keywords: Map<string, TokenType> = new Map([
+    // Constants
+    ["true", TokenType.TRUE],
+    ["false", TokenType.FALSE],
+    
+    // Declarations
+    ["var", TokenType.VAR],
+    ["record", TokenType.RECORD],
+    ["function", TokenType.FUNCTION],
+    
+    // Visibility
+    ["public", TokenType.PUBLIC],
+    ["private", TokenType.PRIVATE],
+    
+    ["if", TokenType.IF],
+    ["else", TokenType.ELSE],
+    ["and", TokenType.AND],
+    ["or", TokenType.OR],
+    
+    ["for", TokenType.FOR],
+    ["while", TokenType.WHILE],
+    
+    ["return", TokenType.RETURN]
+  ]);
+
   private readonly tokens: Array<Token> = [];
   private current: number = 0;
   private start: number = 0;
@@ -10,6 +35,20 @@ export class Scanner {
 
   private isAtEnd (): boolean {
     return this.current >= this.source.length;
+  }
+
+  private isDigit (char: string): boolean {
+    return char >= '0' && char <= '9';
+  }
+
+  private isAlpha (char: string): boolean {
+    return (char >= 'a' && char <= 'z') ||
+           (char >= 'A' && char <= 'Z') ||
+            char === '_';
+  }
+
+  private isAlphaNumeric (char: string): boolean {
+    return this.isAlpha(char) || this.isDigit(char);
   }
 
   public scanTokens (): Array<Token> {
@@ -39,6 +78,10 @@ export class Scanner {
     return this.source.charAt(this.current);
   }
 
+  private peekNext (): string {
+    if (this.current + 1 >= this.source.length) return '\0';
+    return this.source.charAt(this.current + 1);
+  } 
 
   private match (expected: string): boolean {
     if (this.isAtEnd()) return false;
@@ -48,7 +91,7 @@ export class Scanner {
     return true;
   }
 
-  private addToken (type: TokenType, literal: string | null = null): void {
+  private addToken (type: TokenType, literal: string | number | null = null): void {
     const text = this.source.substring(this.start, this.current);
     this.tokens.push(new Token(type, text, literal, this.line));
   }
@@ -71,6 +114,28 @@ export class Scanner {
     // Trim the surrounding quotes.
     const value = this.source.substring(this.start + 1, this.current - 1);
     this.addToken(TokenType.STRING, value);
+  }
+
+  private number (): void {
+    while (this.isDigit(this.peek())) this.advance();
+
+    // Look for a fractional part.
+    if (this.peek() === '.' && this.isDigit(this.peekNext())) {
+      // Consume the "."
+      this.advance();
+
+      while (this.isDigit(this.peek())) this.advance();
+    }
+
+    this.addToken(TokenType.NUMBER, parseFloat(this.source.substring(this.start, this.current)));
+  }
+
+  private identifier (): void {
+    while (this.isAlphaNumeric(this.peek())) this.advance();
+
+    const text = this.source.substring(this.start, this.current);
+    const type = this.keywords.get(text) ?? TokenType.IDENTIFIER;
+    this.addToken(type);
   }
 
   private scanToken (): void {
@@ -114,9 +179,8 @@ export class Scanner {
         // A comment goes until the end of the line.
         if (this.match('/')) {
           while (this.peek() !== '\n' && !this.isAtEnd()) this.advance();
-          const comment = this.source.substring(this.start, this.current).trim();
-          console.info(`[COMMENT(//)]: ${comment}`);
           // NOTE: maybe we can do something with the comment here ?
+          // const comment = this.source.substring(this.start, this.current).trim();
         }
         else {
           this.addToken(TokenType.SLASH);
@@ -131,15 +195,27 @@ export class Scanner {
         break;
 
       case '"':
-      case "'":
+      case "'": {
         this.string(char);
         break;
+      }
 
-      case '\n':
+      case '\n': {
         this.line++;
         break;
+      }
 
-      default: console.error(`unexpected character "${char}"`);
+      default: {
+        if (this.isDigit(char)) {
+          this.number();
+        }
+        else if (this.isAlpha(char)) {
+          this.identifier();
+        }
+        else {
+          console.error(`unexpected character "${char}"`);
+        }
+      }
     }
   }
 }
