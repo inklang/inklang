@@ -1,0 +1,13 @@
+{
+  "name": "inklang",
+  "version": "0.0.0",
+  "description": "",
+  "author": "LiterateInk",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "^1.1.17"
+  },
+  "dependencies": {
+    "change-case": "^5.4.4"
+  }
+}
