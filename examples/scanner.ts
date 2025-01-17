@@ -1,4 +1,5 @@
 import { Scanner } from "../src/scanner";
+import { TokenType } from "../src/token";
 
 const session_ink = `
   // hello world
@@ -8,12 +9,18 @@ const session_ink = `
   }
 
   function something ()  {
-    var constant = "some string !";
-    var constant = "\\"some string !\\"";
-    var constant = 'some string !';
-    var constant = '\\'some string !\\'';
+    var str = "some string !";
+    var str = "\\"some string !\\"";
+    var str = 'some string !';
+    var str = '\\'some string !\\'';
+
+    var nb = 1;
+    var nb = 1.50;
+    var nb = 10.50;
   }
 `;
 
 const tokenizer = new Scanner(session_ink);
-console.log(tokenizer.scanTokens());
+for (const token of tokenizer.scanTokens()) {
+  console.log(TokenType[token.type], ":", token.literal ?? token.lexeme);
+}
