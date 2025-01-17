@@ -13,7 +13,7 @@ async function call-api (
   )
 
   var text = @bytesToUtf8(response);
-  print(text);
+  @print(text);
 
   var response = await @fetch(
     url: "https://github.com" + path,
@@ -21,7 +21,7 @@ async function call-api (
   )
 
   var text = @bytesToUtf8(response);
-  print(text);
+  @print(text);
 }
 
 function create-session (name: string, @js:only(fetcher: @js:fetcher)) -> session {
