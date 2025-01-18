@@ -30,7 +30,7 @@ expose function add (a: u32, b: u32) -> u32 {
 This will generate the following JavaScript (CJS mode) code:
 
 ```javascript
-const add (a, b) => {
+const add = (a, b) => {
   return a + b;
 };
 exports.add = add;
@@ -39,7 +39,7 @@ exports.add = add;
 or the following in JavaScript EJS mode:
 
 ```javascript
-export const add (a, b) => {
+export const add = (a, b) => {
   return a + b;
 };
 ```
