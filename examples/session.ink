@@ -1,6 +1,6 @@
 record session {
-  public name: string
-  @js:only(private fetcher: @js:fetcher)
+  public name: string,
+  @js:only(public fetcher: @js:fetcher)
 }
 
 async function call-api (
@@ -9,8 +9,8 @@ async function call-api (
   @js:only(fetcher: @js:fetcher)
 ) -> void {
   var response = await @fetch(
-    url: "https://github.com" + path,
-  )
+    url: "https://github.com" + path
+  );
 
   var text = @bytesToUtf8(response);
   @print(text);
@@ -18,7 +18,7 @@ async function call-api (
   var response = await @fetch(
     url: "https://github.com" + path,
     @js:only(fetcher: session.fetcher)
-  )
+  );
 
   var text = @bytesToUtf8(response);
   @print(text);
@@ -28,5 +28,5 @@ function create-session (name: string, @js:only(fetcher: @js:fetcher)) -> sessio
   return session {
     name: name,
     @js:only(fetcher: fetcher)
-  }
+  };
 }

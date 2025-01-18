@@ -1,31 +1,29 @@
 import { Scanner } from "../src/scanner";
-// import { TokenType } from "../src/token";
 import { Parser } from "../src/parser";
+import { TranslatorJS } from "../src/translators/javascript";
+import { TranslatorTS } from "../src/translators/typescript";
+import { TranslatorKotlin } from "../src/translators/kotlin";
 
 const session_ink = `
-  // hello world
-  //record session {
-  //  public name: string
-  //  @js:only(private fetcher: @js:fetcher)
-  //}
-  //function something ()  {
-  //  var str = "some string !";
-  //  var str = "\\"some string !\\"";
-  //  var str = 'some string !';
-  //  var str = '\\'some string !\\'';
-  //  var nb = 1;
-  //  var nb = 1.50;
-  //  var nb = 10.50;
-  //}
-
-  function hello () -> void {
+  // hello world :)
+  expose function hello_world (name: string, nb: u16) -> void {
+    var x = 10;
   }
 `;
 
 const tokenizer = new Scanner(session_ink);
-// for (const token of tokenizer.scanTokens()) {
-//   console.log(TokenType[token.type], ":", token.literal ?? token.lexeme);
-// }
 const parser = new Parser(tokenizer.scanTokens());
-const expression = parser.parse();
-console.log(expression);
+const statements = parser.parse();
+// console.dir(statements, { depth: Infinity });
+
+const javascriptCJS = new TranslatorJS(statements, "cjs");
+const javascriptMJS = new TranslatorJS(statements, "mjs");
+const typescript = new TranslatorTS(statements);
+const kotlin = new TranslatorKotlin(statements);
+
+void async function () {
+  await javascriptCJS.execute();
+  await javascriptMJS.execute();
+  await typescript.execute();
+  await kotlin.execute();
+}();
