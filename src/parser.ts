@@ -1,11 +1,11 @@
 import Expr from "./expression";
-import Stmt from "./statement";
+import Stmt, { Function, FunctionParameter, Variable } from "./statement";
 import { Token, TokenType } from "./token";
 
 export class Parser {
   public constructor (private readonly tokens: Array<Token>) {}
   private current: number = 0;
-  
+
   private peek (): Token {
     return this.tokens[this.current];
   }
@@ -46,7 +46,7 @@ export class Parser {
   }
 
   private error (token: Token, message: string): Error {
-    console.error(`[line ${token.line}] Error ${token.lexeme}: ${message}`);
+    console.error(`[${token.line}] Error: ${message}`);
     return new Error(message);
   }
 
@@ -57,6 +57,10 @@ export class Parser {
 
     if (this.match(TokenType.NUMBER, TokenType.STRING)) {
       return new Expr.Literal(this.previous().literal);
+    }
+
+    if (this.match(TokenType.IDENTIFIER)) {
+      return new Expr.Variable(this.previous());
     }
 
     if (this.match(TokenType.LPAREN)) {
@@ -81,7 +85,6 @@ export class Parser {
 
     return this.primary();
   }
-
 
   private factor (): Expr {
     let expr = this.unary();
@@ -134,50 +137,140 @@ export class Parser {
     return expr;
   }
 
-  // private synchronize (): void {
-  //   this.advance();
-
-  //   while (!this.isAtEnd()) {
-  //     if (this.previous().type == TokenType.SEMICOLON) return;
-
-  //     switch (this.peek().type) {
-  //       case TokenType.RECORD:
-  //       case TokenType.FUNCTION:
-  //       case TokenType.VAR:
-  //       case TokenType.FOR:
-  //       case TokenType.IF:
-  //       case TokenType.WHILE:
-  //       case TokenType.RETURN:
-  //         return;
-  //     }
-
-  //     this.advance();
-  //   }
-  // }
-
   private expressionStatement (): Stmt {
-    const expr = this.expression();
+    const value = this.expression();
     this.consume(TokenType.SEMICOLON, "expect ';' after expression.");
-    return new Stmt.Expression(expr);
+    return new Stmt.Expression(value);
+  }
+
+  private block(): Array<Stmt> {
+    const statements: Array<Stmt> = [];
+
+    while (!this.check(TokenType.RBRACE)) {
+      const statement = this.declaration();
+      if (statement) {
+        statements.push(statement);
+      }
+    }
+
+    this.consume(TokenType.RBRACE, "Expect '}' after block.");
+
+    return statements;
   }
 
   private statement (): Stmt {
+    if (this.match(TokenType.FOR)) {
+      throw this.error(this.previous(), "for statement not implemented yet.");
+      // return this.forStatement();
+    }
+    if (this.match(TokenType.IF)) {
+      throw this.error(this.previous(), "if statement not implemented yet.");
+      // return this.ifStatement();
+    }
+    if (this.match(TokenType.RETURN)) {
+      throw this.error(this.previous(), "return statement not implemented yet.");
+      // return this.returnStatement();
+    }
+    if (this.match(TokenType.WHILE)) {
+      throw this.error(this.previous(), "while statement not implemented yet.");
+      // return this.whileStatement();
+    }
+
+    if (this.match(TokenType.LBRACE)) {
+      return new Stmt.Block(this.block());
+    }
+
     return this.expressionStatement();
   }
 
-  public parse (): Array<Stmt> | null {
-    try {
-      const statements: Array<Stmt> = [];
+  private functionDeclaration (exposed: boolean): Function {
+    // function something (a: int, b: int) -> type {}
+    //          ^^^^^^^^^
+    const name = this.consume(TokenType.IDENTIFIER, "expect function name.");
 
-      while (!this.isAtEnd()) {
-        statements.push(this.statement());
+    // function something (a: int, b: int) -> type {}
+    //                    ^
+    this.consume(TokenType.LPAREN, "expect '(' after function name.");
+
+    const parameters: Array<FunctionParameter> = [];
+    if (!this.check(TokenType.RPAREN)) {
+      do {
+        // function something (a: int, b: int) -> type {}
+        //                     ^
+        const name = this.consume(TokenType.IDENTIFIER, "expect parameter name.")
+
+        // function something (a: int, b: int) -> type {}
+        //                      ^
+        this.consume(TokenType.COLON, "expect colon for parameter type.")
+
+        // function something (a: int, b: int) -> type {}
+        //                        ^^^
+        const type = this.consume(TokenType.IDENTIFIER, "expect parameter type.")
+
+        parameters.push(new FunctionParameter(name, type));
       }
 
-      return statements;
+      // function something (a: int, b: int) -> type {}
+      //                           ^
+      while (this.match(TokenType.COMMA));
     }
-    catch (error) {
-      console.error(error);
-      return null;
+
+    // function something (a: int, b: int) -> type {}
+    //                                   ^
+    this.consume(TokenType.RPAREN, "expect ')' after parameters.");
+
+    // function something (a: int, b: int) -> type {}
+    //                                     ^^
+    this.consume(TokenType.RARROW, "expect '->' to define function return type.");
+
+    // function something (a: int, b: int) -> type {}
+    //                                        ^^^^
+    const returnType = this.consume(TokenType.IDENTIFIER, "expect return type.");
+
+    // function something (a: int, b: int) -> type {}
+    //                                             ^
+    this.consume(TokenType.LBRACE, "expect '{' to open function body.");
+
+    // Will retrieve the function body and expect the `}` token.
+    const body = this.block();
+
+    return new Function(name, parameters, body, returnType, exposed);
+  }
+
+  private variableDeclaration (): Variable {
+    const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
+
+    let initializer: Expr | null = null;
+    if (this.match(TokenType.EQUAL)) {
+      initializer = this.expression();
     }
+
+    this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
+    return new Variable(name, initializer);
+  }
+
+  private declaration (): Stmt {
+    const exposed = this.match(TokenType.EXPOSE);
+
+    if (this.match(TokenType.VAR)) {
+      return this.variableDeclaration();
+    }
+
+    if (this.match(TokenType.FUNCTION)) {
+      return this.functionDeclaration(exposed);
+    }
+
+    return this.statement();
+  }
+
+  public parse (): Array<Stmt> {
+    const statements: Array<Stmt> = [];
+
+    while (!this.isAtEnd()) {
+      const statement = this.declaration();
+      if (statement) statements.push(statement);
+    }
+
+    return statements;
   }
 }
