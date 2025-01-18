@@ -15,6 +15,7 @@ export enum TokenType {
   SLASH,
   STAR,
   AT,
+  RARROW,
 
   // 1-2 character tokens.
   BANG, BANG_EQUAL,
@@ -42,6 +43,7 @@ export enum TokenType {
   OR,
   RETURN,
   FUNCTION,
+  EXPOSE,
 
   EOF
 }
