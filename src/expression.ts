@@ -27,5 +27,25 @@ export default abstract class Expr {
       public readonly right: Expr,
     ) { super() }
   }
-}
 
+  public static readonly Variable = class Variable extends Expr {
+    public constructor (
+      public readonly name: Token,
+    ) { super() }
+  }
+
+  public static readonly Logical = class Logical extends Expr {
+    public constructor (
+      public readonly left: Expr,
+      public readonly operator: Token,
+      public readonly right: Expr,
+    ) { super() }
+  }
+
+  public static readonly Assign = class Assign extends Expr {
+    public constructor (
+      public readonly name: Token,
+      public readonly value: Expr,
+    ) { super() }
+  }
+}
