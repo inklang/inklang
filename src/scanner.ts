@@ -7,24 +7,25 @@ export class Scanner {
     // Constants
     ["true", TokenType.TRUE],
     ["false", TokenType.FALSE],
-    
+
     // Declarations
     ["var", TokenType.VAR],
     ["record", TokenType.RECORD],
     ["function", TokenType.FUNCTION],
-    
+
     // Visibility
     ["public", TokenType.PUBLIC],
     ["private", TokenType.PRIVATE],
-    
+    ["expose", TokenType.EXPOSE],
+
     ["if", TokenType.IF],
     ["else", TokenType.ELSE],
     ["and", TokenType.AND],
     ["or", TokenType.OR],
-    
+
     ["for", TokenType.FOR],
     ["while", TokenType.WHILE],
-    
+
     ["return", TokenType.RETURN]
   ]);
 
@@ -81,7 +82,7 @@ export class Scanner {
   private peekNext (): string {
     if (this.current + 1 >= this.source.length) return '\0';
     return this.source.charAt(this.current + 1);
-  } 
+  }
 
   private match (expected: string): boolean {
     if (this.isAtEnd()) return false;
@@ -151,14 +152,28 @@ export class Scanner {
       case ':': this.addToken(TokenType.COLON);     break;
       case ',': this.addToken(TokenType.COMMA);     break;
       case '.': this.addToken(TokenType.DOT);       break;
-      case '-': this.addToken(TokenType.MINUS);     break;
       case '+': this.addToken(TokenType.PLUS);      break;
       case ';': this.addToken(TokenType.SEMICOLON); break;
       case '*': this.addToken(TokenType.STAR);      break;
       case '@': this.addToken(TokenType.AT);        break;
 
+      case '-': {
+        this.addToken(
+          this.match('>')
+            ? TokenType.RARROW // ->
+            : TokenType.MINUS  // -
+        );
+
+        break;
+      }
+
       case '!': {
-        this.addToken(this.match('=') ? TokenType.BANG_EQUAL : TokenType.BANG);
+        this.addToken(
+          this.match('=')
+            ? TokenType.BANG_EQUAL // !=
+            : TokenType.BANG       // !
+        );
+
         break;
       }
       case '=': {
