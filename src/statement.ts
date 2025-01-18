@@ -14,26 +14,11 @@ export default abstract class Stmt {
     ) { super() }
   }
 
-  public static readonly Function = class Function extends Stmt {
-    public constructor (
-      public readonly name: Token,
-      public readonly params: Array<Token>,
-      public readonly body: Array<Stmt>,
-    ) { super() }
-  }
-
   public static readonly If = class If extends Stmt {
     public constructor (
       public readonly condition: Expr,
       public readonly thenBranch: Stmt,
       public readonly elseBranch: Stmt | null,
-    ) { super() }
-  }
-
-  public static readonly Variable = class Variable extends Stmt {
-    public constructor (
-      public readonly name: Token,
-      public readonly initializer: Expr
     ) { super() }
   }
 
@@ -43,4 +28,28 @@ export default abstract class Stmt {
       public readonly value: Expr
     ) { super() }
   }
+}
+
+export class Function extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly params: Array<FunctionParameter>,
+    public readonly body: Array<Stmt>,
+    public readonly returnType: Token,
+    public readonly exposed: boolean
+  ) { super() }
+}
+
+export class FunctionParameter extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly type: Token,
+  ) { super() }
+}
+
+export class Variable extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly initializer: Expr | null
+  ) { super() }
 }
