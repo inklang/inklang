@@ -98,7 +98,6 @@ export class Parser {
     return expr;
   }
 
-
   private term (): Expr {
     let expr = this.factor();
 
@@ -111,7 +110,6 @@ export class Parser {
     return expr;
   }
 
-
   private comparison (): Expr {
     let expr = this.term();
 
@@ -123,7 +121,6 @@ export class Parser {
 
     return expr;
   }
-
 
   private equality (): Expr {
     let expr = this.comparison();
@@ -146,6 +143,7 @@ export class Parser {
   private block(): Array<Stmt> {
     const statements: Array<Stmt> = [];
 
+    // We keep parsing until we reach the end of the block ('}')
     while (!this.check(TokenType.RBRACE)) {
       const statement = this.declaration();
       if (statement) {
@@ -153,9 +151,22 @@ export class Parser {
       }
     }
 
-    this.consume(TokenType.RBRACE, "Expect '}' after block.");
-
+    this.consume(TokenType.RBRACE, "expect '}' after block.");
     return statements;
+  }
+
+  private returnStatement (): Stmt {
+    const keyword = this.previous();
+    let value: Expr | null = null;
+
+    // We check if it's not a single `return;`
+    if (!this.check(TokenType.SEMICOLON)) {
+      // We parse the expression that follows the `return` keyword.
+      value = this.expression();
+    }
+
+    this.consume(TokenType.SEMICOLON, "expect ';' after return value.");
+    return new Stmt.Return(keyword, value);
   }
 
   private statement (): Stmt {
@@ -168,8 +179,7 @@ export class Parser {
       // return this.ifStatement();
     }
     if (this.match(TokenType.RETURN)) {
-      throw this.error(this.previous(), "return statement not implemented yet.");
-      // return this.returnStatement();
+      return this.returnStatement();
     }
     if (this.match(TokenType.WHILE)) {
       throw this.error(this.previous(), "while statement not implemented yet.");

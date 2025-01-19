@@ -25,7 +25,7 @@ export default abstract class Stmt {
   public static readonly Return = class Return extends Stmt {
     public constructor (
       public readonly keyword: Token,
-      public readonly value: Expr
+      public readonly value: Expr | null
     ) { super() }
   }
 }
