@@ -1,0 +1,19 @@
+{
+  "name": "fetchdemo",
+  "version": "0.0.0",
+  "repository": "https://github.com/LiterateInk/inklang",
+  "sideEffects": false,
+  "main": "./generated/javascript/index.cjs",
+  "module": "./generated/javascript/index.mjs",
+  "types": "./generated/javascript/index.d.ts",
+  "exports": {
+    "types": "./generated/javascript/index.d.ts",
+    "import": "./generated/javascript/index.mjs",
+    "require": "./generated/javascript/index.cjs"
+  },
+  "files": [
+    "generated/javascript"
+  ],
+  "dependencies": {},
+  "devDependencies": {}
+}
