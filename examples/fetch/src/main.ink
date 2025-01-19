@@ -1,3 +1,5 @@
-record session {
-  public name: string,
+expose record session {
+  uwu: u16
+  private something: string
+  public name: string
 }
