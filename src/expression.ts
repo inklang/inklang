@@ -48,4 +48,28 @@ export default abstract class Expr {
       public readonly value: Expr,
     ) { super() }
   }
+
+  public static readonly Call = class Call extends Expr {
+    public constructor (
+      public readonly callee: Expr,
+      public readonly paren: Token,
+      public readonly args: Array<Expr>,
+      public readonly annotation: boolean,
+    ) { super() }
+  }
+
+  public static readonly Get = class Get extends Expr {
+    public constructor (
+      public readonly object: Expr,
+      public readonly name: Token
+    ) { super() }
+  }
+
+  public static readonly Set = class Set extends Expr {
+    public constructor (
+      public readonly object: Expr,
+      public readonly name: Token,
+      public readonly value: Expr
+    ) { super() }
+  }
 }
