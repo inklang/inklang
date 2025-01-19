@@ -31,9 +31,7 @@ export class TranslatorJS {
       output += `const ${functionName} = (`;
       for (let i = 0; i < statement.params.length; i++) {
         const param = statement.params[i];
-
-        // we don't need the type because JS is dynamically typed
-        output += `${param.name.lexeme}${i !== statement.params.length - 1 ? ", " : ""}`;
+        output += `${camelCase(param.name.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
       }
 
       output += ') => {' + newline;
@@ -51,10 +49,28 @@ export class TranslatorJS {
       return output;
     }
     else if (statement instanceof Variable) {
-      return `let ${statement.name.lexeme} = ${statement.initializer ? this.visit(statement.initializer) : 'void 0'};`;
+      return `let ${camelCase(statement.name.lexeme)} = ${statement.initializer ? this.visit(statement.initializer) : 'void 0'};`;
     }
     else if (statement instanceof Expr.Literal) {
-      return statement.value!.toString();
+      return JSON.stringify(statement.value);
+    }
+    else if (statement instanceof Stmt.Return) {
+      if (statement.value === null) {
+        return "return;";
+      }
+      else {
+        return `return ${this.visit(statement.value)};`;
+      }
+    }
+    else if (statement instanceof Expr.Binary) {
+      const left = this.visit(statement.left);
+      const right = this.visit(statement.right);
+      const operator = statement.operator.lexeme;
+
+      return `${left} ${operator} ${right}`;
+    }
+    else if (statement instanceof Expr.Variable) {
+      return camelCase(statement.name.lexeme);
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
