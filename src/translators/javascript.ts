@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
-import { camelCase } from "change-case";
+import { camelCase, pascalCase } from "change-case";
 
 import Expr from "../expression";
-import Stmt, { Function, Variable } from "../statement";
+import Stmt, { Function, Record, Variable } from "../statement";
 
 const tab = "  ";
 const newline = "\n";
@@ -71,6 +71,43 @@ export class TranslatorJS {
     }
     else if (statement instanceof Expr.Variable) {
       return camelCase(statement.name.lexeme);
+    }
+    else if (statement instanceof Record) {
+      let output = "";
+
+      if (statement.exposed && this.type === "mjs") {
+        output += "export ";
+      }
+
+      const className = pascalCase(statement.name.lexeme);
+      output += `class ${className} {` + newline;
+
+      for (const field of statement.fields) {
+        const fieldName = camelCase(field.name.lexeme);
+        output += tab + fieldName + ";" + newline;
+      }
+
+      output += tab + "constructor (";
+      for (let i = 0; i < statement.fields.length; i++) {
+        const field = statement.fields[i];
+        const fieldName = camelCase(field.name.lexeme);
+        output += `${fieldName}${i !== statement.fields.length - 1 ? ", " : ""}`;
+      }
+      output += ") {" + newline;
+
+      for (const field of statement.fields) {
+        const fieldName = camelCase(field.name.lexeme);
+        output += tab.repeat(2) + `this.${fieldName} = ${fieldName};` + newline;
+      }
+
+      output += tab + '}' + newline;
+      output += '}' + newline;
+
+      if (statement.exposed && this.type === "cjs") {
+        output += newline + `exports.${className} = ${className};`;
+      }
+
+      return output;
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);

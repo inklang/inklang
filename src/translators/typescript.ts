@@ -2,8 +2,10 @@ import fs from "node:fs/promises";
 import { camelCase } from "change-case";
 
 import Expr from "../expression";
-import Stmt, { Function, Variable } from "../statement";
+import Stmt, { Function, Record, Variable } from "../statement";
+import { pascalCase } from "change-case";
 
+const tab = "  ";
 const noop = "";
 const newline = "\n";
 
@@ -46,9 +48,7 @@ export class TranslatorTS {
       let output = `export function ${camelCase(statement.name.lexeme)} (`; // function name
       for (let i = 0; i < statement.params.length; i++) {
         const param = statement.params[i];
-
-        // we don't need the type because JS is dynamically typed
-        output += `${param.name.lexeme}: ${this.type(param.type.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
+        output += `${camelCase(param.name.lexeme)}: ${this.type(param.type.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
       }
 
       output += `): ${this.type(statement.returnType.lexeme)};` + newline;
@@ -60,6 +60,27 @@ export class TranslatorTS {
     }
     else if (statement instanceof Expr.Literal) {
       return noop;
+    }
+    else if (statement instanceof Record) {
+      if (!statement.exposed) return noop;
+
+      const className = pascalCase(statement.name.lexeme);
+      let output = `export class ${className} {` + newline;
+
+      for (const field of statement.fields) {
+        const visibility = field.visibility ? field.visibility.lexeme : "public";
+        output += tab + `${visibility} ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)};` + newline;
+      }
+
+      output += tab + "constructor (";
+      for (let i = 0; i < statement.fields.length; i++) {
+        const field = statement.fields[i];
+        output += `${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)}${i !== statement.fields.length - 1 ? ", " : ""}`;
+      }
+      output += ");" + newline;
+
+      output += '}';
+      return output;
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
