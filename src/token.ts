@@ -44,6 +44,7 @@ export enum TokenType {
   RETURN,
   FUNCTION,
   EXPOSE,
+  NULL,
 
   EOF
 }

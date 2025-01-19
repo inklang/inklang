@@ -7,6 +7,7 @@ export class Scanner {
     // Constants
     ["true", TokenType.TRUE],
     ["false", TokenType.FALSE],
+    ["null", TokenType.NULL],
 
     // Declarations
     ["var", TokenType.VAR],
