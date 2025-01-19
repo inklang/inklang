@@ -1,158 +1,104 @@
 import Expr from "./expression";
-import Stmt, { Function, FunctionParameter, Variable } from "./statement";
+import Stmt, { Function, FunctionParameter, Record, RecordField, Variable, While } from "./statement";
 import { Token, TokenType } from "./token";
 
 export class Parser {
   public constructor (private readonly tokens: Array<Token>) {}
   private current: number = 0;
 
-  private peek (): Token {
-    return this.tokens[this.current];
-  }
+  public parse (): Array<Stmt> {
+    const statements: Array<Stmt> = [];
 
-  private isAtEnd (): boolean {
-    return this.peek().type === TokenType.EOF;
-  }
-
-  private previous (): Token {
-    return this.tokens[this.current - 1];
-  }
-
-  private check (type: TokenType): boolean {
-    if (this.isAtEnd()) return false;
-    return this.peek().type === type;
-  }
-
-  private advance (): Token {
-    if (!this.isAtEnd()) this.current++;
-    return this.previous();
-  }
-
-  private consume (type: TokenType, message: string): Token {
-    if (this.check(type)) return this.advance();
-
-    throw this.error(this.peek(), message);
-  }
-
-  private match (...types: Array<TokenType>): boolean {
-    for (const type of types) {
-      if (this.check(type)) {
-        this.advance();
-        return true;
-      }
+    while (!this.isAtEnd()) {
+      const statement = this.declaration();
+      statements.push(statement);
     }
 
-    return false;
-  }
-
-  private error (token: Token, message: string): Error {
-    console.error(`[${token.line}] Error: ${message}`);
-    return new Error(message);
-  }
-
-  private primary (): Expr {
-    if (this.match(TokenType.FALSE)) return new Expr.Literal(false);
-    if (this.match(TokenType.TRUE)) return new Expr.Literal(true);
-    // if (this.match(TokenType.NIL)) return new Expr.Literal(null);
-
-    if (this.match(TokenType.NUMBER, TokenType.STRING)) {
-      return new Expr.Literal(this.previous().literal);
-    }
-
-    if (this.match(TokenType.IDENTIFIER)) {
-      return new Expr.Variable(this.previous());
-    }
-
-    if (this.match(TokenType.LPAREN)) {
-      const expr = this.expression();
-      this.consume(TokenType.RPAREN, "expect ')' after expression.");
-      return new Expr.Grouping(expr);
-    }
-
-    throw this.error(this.peek(), "expect expression.");
+    return statements;
   }
 
   private expression (): Expr {
-    return this.equality();
+    return this.assignment();
   }
 
-  private unary (): Expr {
-    if (this.match(TokenType.BANG, TokenType.MINUS)) {
-      const operator = this.previous();
-      const right = this.unary();
-      return new Expr.Unary(operator, right);
+  private declaration (): Stmt {
+    const exposed = this.match(TokenType.EXPOSE);
+    // TODO: async
+
+    if (this.match(TokenType.RECORD)) {
+      return this.recordDeclaration(exposed);
     }
 
-    return this.primary();
-  }
-
-  private factor (): Expr {
-    let expr = this.unary();
-
-    while (this.match(TokenType.SLASH, TokenType.STAR)) {
-      const operator = this.previous();
-      const right = this.unary();
-      expr = new Expr.Binary(expr, operator, right);
+    if (this.match(TokenType.FUNCTION)) {
+      return this.functionDeclaration(exposed);
     }
 
-    return expr;
-  }
-
-  private term (): Expr {
-    let expr = this.factor();
-
-    while (this.match(TokenType.MINUS, TokenType.PLUS)) {
-      const operator = this.previous();
-      const right = this.factor();
-      expr = new Expr.Binary(expr, operator, right);
+    if (this.match(TokenType.VAR)) {
+      return this.variableDeclaration();
     }
 
-    return expr;
+    return this.statement();
   }
 
-  private comparison (): Expr {
-    let expr = this.term();
+  private recordDeclaration (exposed: boolean): Record {
+    const name = this.consume(TokenType.IDENTIFIER, "expect record name.");
+    this.consume(TokenType.LBRACE, "expect '{' after record name.");
 
-    while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
-      const operator = this.previous();
-      const right = this.term();
-      expr = new Expr.Binary(expr, operator, right);
+    const fields: Array<RecordField> = [];
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      let visibility: Token | null = null;
+      if (this.match(TokenType.PRIVATE, TokenType.PUBLIC)) {
+        visibility = this.previous();
+      };
+
+      const field = this.consume(TokenType.IDENTIFIER, "expect field name.");
+      this.consume(TokenType.COLON, "expect ':' after field name.");
+      const type = this.consume(TokenType.IDENTIFIER, "expect field type.");
+
+      fields.push(new RecordField(field, type, visibility));
     }
 
-    return expr;
+    this.consume(TokenType.RBRACE, "expect '}' after record fields.");
+    return new Record(name, fields, exposed);
   }
 
-  private equality (): Expr {
-    let expr = this.comparison();
-
-    while (this.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
-      const operator = this.previous();
-      const right = this.comparison();
-      expr = new Expr.Binary(expr, operator, right);
+  private statement (): Stmt {
+    if (this.match(TokenType.FOR)) {
+      return this.forStatement();
+    }
+    if (this.match(TokenType.IF)) {
+      return this.ifStatement();
+    }
+    if (this.match(TokenType.RETURN)) {
+      return this.returnStatement();
+    }
+    if (this.match(TokenType.WHILE)) {
+      return this.whileStatement();
     }
 
-    return expr;
-  }
-
-  private expressionStatement (): Stmt {
-    const value = this.expression();
-    this.consume(TokenType.SEMICOLON, "expect ';' after expression.");
-    return new Stmt.Expression(value);
-  }
-
-  private block(): Array<Stmt> {
-    const statements: Array<Stmt> = [];
-
-    // We keep parsing until we reach the end of the block ('}')
-    while (!this.check(TokenType.RBRACE)) {
-      const statement = this.declaration();
-      if (statement) {
-        statements.push(statement);
-      }
+    if (this.match(TokenType.LBRACE)) {
+      return new Stmt.Block(this.block());
     }
 
-    this.consume(TokenType.RBRACE, "expect '}' after block.");
-    return statements;
+    return this.expressionStatement();
+  }
+
+  private forStatement (): Stmt {
+    throw this.error(this.previous(), "for statement not implemented yet.");
+  }
+
+  private ifStatement (): Stmt {
+    this.consume(TokenType.LPAREN, "expect '(' after 'if'.");
+    const condition = this.expression();
+    this.consume(TokenType.RPAREN, "expect ')' after condition.");
+
+    const thenBranch = this.statement();
+    let elseBranch: Stmt | null = null;
+    if (this.match(TokenType.ELSE)) {
+      elseBranch = this.statement();
+    }
+
+    return new Stmt.If(condition, thenBranch, elseBranch);
   }
 
   private returnStatement (): Stmt {
@@ -169,28 +115,31 @@ export class Parser {
     return new Stmt.Return(keyword, value);
   }
 
-  private statement (): Stmt {
-    if (this.match(TokenType.FOR)) {
-      throw this.error(this.previous(), "for statement not implemented yet.");
-      // return this.forStatement();
-    }
-    if (this.match(TokenType.IF)) {
-      throw this.error(this.previous(), "if statement not implemented yet.");
-      // return this.ifStatement();
-    }
-    if (this.match(TokenType.RETURN)) {
-      return this.returnStatement();
-    }
-    if (this.match(TokenType.WHILE)) {
-      throw this.error(this.previous(), "while statement not implemented yet.");
-      // return this.whileStatement();
+  private variableDeclaration (): Variable {
+    const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
+
+    let initializer: Expr | null = null;
+    if (this.match(TokenType.EQUAL)) {
+      initializer = this.expression();
     }
 
-    if (this.match(TokenType.LBRACE)) {
-      return new Stmt.Block(this.block());
-    }
+    this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
+    return new Variable(name, initializer);
+  }
 
-    return this.expressionStatement();
+  private whileStatement (): Stmt {
+    this.consume(TokenType.LPAREN, "expect '(' after 'while'.");
+    const condition = this.expression();
+    this.consume(TokenType.RPAREN, "expect ')' after condition.");
+    const body = this.statement();
+
+    return new While(condition, body);
+  }
+
+  private expressionStatement (): Stmt {
+    const value = this.expression();
+    this.consume(TokenType.SEMICOLON, "expect ';' after expression.");
+    return new Stmt.Expression(value);
   }
 
   private functionDeclaration (exposed: boolean): Function {
@@ -247,40 +196,220 @@ export class Parser {
     return new Function(name, parameters, body, returnType, exposed);
   }
 
-  private variableDeclaration (): Variable {
-    const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
-
-    let initializer: Expr | null = null;
-    if (this.match(TokenType.EQUAL)) {
-      initializer = this.expression();
-    }
-
-    this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
-    return new Variable(name, initializer);
-  }
-
-  private declaration (): Stmt {
-    const exposed = this.match(TokenType.EXPOSE);
-
-    if (this.match(TokenType.VAR)) {
-      return this.variableDeclaration();
-    }
-
-    if (this.match(TokenType.FUNCTION)) {
-      return this.functionDeclaration(exposed);
-    }
-
-    return this.statement();
-  }
-
-  public parse (): Array<Stmt> {
+  private block(): Array<Stmt> {
     const statements: Array<Stmt> = [];
 
-    while (!this.isAtEnd()) {
-      const statement = this.declaration();
-      if (statement) statements.push(statement);
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      statements.push(this.declaration());
     }
 
+    this.consume(TokenType.RBRACE, "expect '}' after block.");
     return statements;
+  }
+
+  private assignment (): Expr {
+    const expr = this.or();
+
+    if (this.match(TokenType.EQUAL)) {
+      const equals = this.previous();
+      const value = this.assignment();
+
+      if (expr instanceof Expr.Variable) {
+        const name = expr.name;
+        return new Expr.Assign(name, value);
+      }
+      else if (expr instanceof Expr.Get) {
+        return new Expr.Set(expr.object, expr.name, value);
+      }
+
+      throw this.error(equals, "invalid assignment target.");
+    }
+
+    return expr;
+  }
+
+  private or (): Expr {
+    let expr = this.and();
+
+    while (this.match(TokenType.OR)) {
+      const operator = this.previous();
+      const right = this.and();
+      expr = new Expr.Logical(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private and (): Expr {
+    let expr = this.equality();
+
+    while (this.match(TokenType.AND)) {
+      const operator = this.previous();
+      const right = this.equality();
+      expr = new Expr.Logical(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private equality (): Expr {
+    let expr = this.comparison();
+
+    while (this.match(TokenType.BANG_EQUAL, TokenType.EQUAL_EQUAL)) {
+      const operator = this.previous();
+      const right = this.comparison();
+      expr = new Expr.Binary(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private comparison (): Expr {
+    let expr = this.term();
+
+    while (this.match(TokenType.GREATER, TokenType.GREATER_EQUAL, TokenType.LESS, TokenType.LESS_EQUAL)) {
+      const operator = this.previous();
+      const right = this.term();
+      expr = new Expr.Binary(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private term (): Expr {
+    let expr = this.factor();
+
+    while (this.match(TokenType.MINUS, TokenType.PLUS)) {
+      const operator = this.previous();
+      const right = this.factor();
+      expr = new Expr.Binary(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private factor (): Expr {
+    let expr = this.unary();
+
+    while (this.match(TokenType.SLASH, TokenType.STAR)) {
+      const operator = this.previous();
+      const right = this.unary();
+      expr = new Expr.Binary(expr, operator, right);
+    }
+
+    return expr;
+  }
+
+  private unary (): Expr {
+    if (this.match(TokenType.BANG, TokenType.MINUS)) {
+      const operator = this.previous();
+      const right = this.unary();
+      return new Expr.Unary(operator, right);
+    }
+
+    return this.call(false);
+  }
+
+  private finishCall (callee: Expr, annotation: boolean): Expr {
+		const args: Array<Expr> = [];
+
+		if (!this.check(TokenType.RPAREN)) {
+			do {
+				args.push(this.expression());
+			} while (this.match(TokenType.COMMA));
+		}
+
+		const paren = this.consume(TokenType.RPAREN, "expect ')' after arguments.") as Token;
+
+		return new Expr.Call(callee, paren, args, annotation);
+	}
+
+  private call (annotation: boolean): Expr {
+		let expression = this.primary();
+
+		while (true) {
+			if (this.match(TokenType.LPAREN)) {
+				expression = this.finishCall(expression, annotation);
+			}
+      else if (this.match(TokenType.DOT)) {
+        const name = this.consume(TokenType.IDENTIFIER, "expect property name after '.'.");
+        expression = new Expr.Get(expression, name);
+      }
+      else {
+        break;
+      }
+		}
+
+		return expression;
+	}
+
+  private primary (): Expr {
+    if (this.match(TokenType.FALSE)) return new Expr.Literal(false);
+    if (this.match(TokenType.TRUE)) return new Expr.Literal(true);
+    if (this.match(TokenType.NULL)) return new Expr.Literal(null);
+
+    if (this.match(TokenType.NUMBER, TokenType.STRING)) {
+      return new Expr.Literal(this.previous().literal);
+    }
+
+    if (this.match(TokenType.IDENTIFIER)) {
+      return new Expr.Variable(this.previous());
+    }
+
+    if (this.match(TokenType.LPAREN)) {
+      const expr = this.expression();
+      this.consume(TokenType.RPAREN, "expect ')' after expression.");
+      return new Expr.Grouping(expr);
+    }
+
+    if (this.match(TokenType.AT)) {
+      return this.call(true);
+    }
+
+    throw this.error(this.peek(), "expect expression.");
+  }
+
+  private match (...types: Array<TokenType>): boolean {
+    for (const type of types) {
+      if (this.check(type)) {
+        this.advance();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private consume (type: TokenType, message: string): Token {
+    if (this.check(type)) return this.advance();
+
+    throw this.error(this.peek(), message);
+  }
+
+  private check (type: TokenType): boolean {
+    if (this.isAtEnd()) return false;
+    return this.peek().type === type;
+  }
+
+  private advance (): Token {
+    if (!this.isAtEnd()) this.current++;
+    return this.previous();
+  }
+
+  private isAtEnd (): boolean {
+    return this.peek().type === TokenType.EOF;
+  }
+
+  private peek (): Token {
+    return this.tokens[this.current];
+  }
+
+  private previous (): Token {
+    return this.tokens[this.current - 1];
+  }
+
+  private error (token: Token, message: string): Error {
+    console.error(`[${token.line}] Error: ${message}`);
+    return new Error(message);
   }
 }

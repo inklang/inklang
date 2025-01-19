@@ -53,3 +53,26 @@ export class Variable extends Stmt {
     public readonly initializer: Expr | null
   ) { super() }
 }
+
+export class Record extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly fields: Array<RecordField>,
+    public readonly exposed: boolean
+  ) { super() }
+}
+
+export class RecordField extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly type: Token,
+    public readonly visibility: Token | null,
+  ) { super() }
+}
+
+export class While extends Stmt {
+  public constructor (
+    public readonly condition: Expr,
+    public readonly body: Stmt,
+  ) { super() }
+}
