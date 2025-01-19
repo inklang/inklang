@@ -1,3 +1,4 @@
+import path from "node:path";
 import { Scanner } from "./scanner";
 import { Parser } from "./parser";
 import Stmt from "./statement";
@@ -10,7 +11,7 @@ import Expr from "./expression";
  * @param code The `ink` code to parse.
  * @returns An array of statements.
  */
-export function parse (code: string): Array<Stmt> {
+export function parse (code: string, entrypoint = path.resolve(".")): Array<Stmt> {
   const scanner = new Scanner(code);
   const tokens = scanner.scanTokens();
   const parser = new Parser(tokens);
