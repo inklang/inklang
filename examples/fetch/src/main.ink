@@ -1,5 +1,12 @@
 expose record session {
   uwu: u16
-  private something: string
-  public name: string
+  something: string
+  name: string
+}
+
+expose function BroIDK (something: string) -> string {
+  var aa: string;
+  aa = "hehe";
+
+  return "bruh" + aa + something;
 }

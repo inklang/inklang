@@ -8,3 +8,9 @@ export class Session {
     this.name = name;
   }
 }
+
+export const broIdk = (something) => {
+  let aa;
+  aa = "hehe";
+  return "bruh" + aa + something;
+};
