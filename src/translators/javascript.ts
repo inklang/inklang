@@ -49,7 +49,13 @@ export class TranslatorJS {
       return output;
     }
     else if (statement instanceof Variable) {
-      return `let ${camelCase(statement.name.lexeme)} = ${statement.initializer ? this.visit(statement.initializer) : 'void 0'};`;
+      let output = `let ${camelCase(statement.name.lexeme)}`;
+
+      if (statement.initializer) {
+        output += ` = ${this.visit(statement.initializer)}`;
+      }
+
+      return output + ";";
     }
     else if (statement instanceof Expr.Literal) {
       return JSON.stringify(statement.value);
@@ -108,6 +114,12 @@ export class TranslatorJS {
       }
 
       return output;
+    }
+    else if (statement instanceof Stmt.Expression) {
+      return this.visit(statement.expression);
+    }
+    else if (statement instanceof Expr.Assign) {
+      return `${camelCase(statement.name.lexeme)} = ${this.visit(statement.value)};`;
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
