@@ -63,7 +63,7 @@ test("function declaration with string addition", () => {
 test("function declaration with parameters renaming", () => {
   expect(translate(`
     function hello_world (my_num: u16, your_num: u16) -> u16 {
-      var their_num = 10;
+      var their_num: u16 = 10;
       return my_num + your_num + their_num;
     }
   `)).toBe(codeFormatter(`

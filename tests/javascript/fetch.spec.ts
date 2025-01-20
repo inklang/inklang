@@ -5,8 +5,8 @@ import { codeFormatter } from "../helpers";
 test("function declaration", () => {
   expect(translate(`
     function do_fetch () -> void {
-      var response = @fetch(
-        url: "https://jsonplaceholder.typicode.com/todos/1"
+      var response: @Response = @fetch(
+        "https://jsonplaceholder.typicode.com/todos/1"
       );
     }
   `)).toBe(codeFormatter(`
