@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import { camelCase } from "change-case";
 
 import Expr from "../expression";
-import Stmt, { Function, Variable } from "../statement";
+import Stmt, { Function, Record, Variable } from "../statement";
+import { pascalCase } from "change-case";
 
 const tab = "  ";
 const newline = "\n";
@@ -53,11 +54,11 @@ export class TranslatorKotlin {
 
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
-      let output = `fun ${camelCase(statement.name.lexeme)}(`;
-      for (let i = 0; i < statement.params.length; i++) {
-        const param = statement.params[i];
-        output += `${param.name.lexeme}: ${this.type(param.type.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
-      }
+      let output = `fun ${camelCase(statement.name.lexeme)} (`;
+
+      output += statement.params.map(
+        (param) => `${camelCase(param.name.lexeme)}: ${this.type(param.type.lexeme)}`
+      ).join(", ");
 
       output += `): ${this.type(statement.returnType.lexeme)} {` + newline;
 
@@ -69,10 +70,58 @@ export class TranslatorKotlin {
       return output;
     }
     else if (statement instanceof Variable) {
-      return `val ${statement.name.lexeme} = ${statement.initializer ? this.visit(statement.initializer) : 'void 0'};`;
+      const initialValue = statement.initializer ? this.visit(statement.initializer) : 'null';
+
+      let type = this.type(statement.type.lexeme);
+      if (!statement.initializer) {
+        type += "?";
+      }
+
+      return `var ${camelCase(statement.name.lexeme)}: ${type} = ${initialValue}`;
     }
     else if (statement instanceof Expr.Literal) {
-      return statement.value!.toString();
+      return JSON.stringify(statement.value);
+    }
+    else if (statement instanceof Stmt.Return) {
+      if (statement.value === null) {
+        return "return";
+      }
+      else {
+        return `return ${this.visit(statement.value)}`;
+      }
+    }
+    else if (statement instanceof Expr.Binary) {
+      const left = this.visit(statement.left);
+      const right = this.visit(statement.right);
+      const operator = statement.operator.lexeme;
+
+      return `${left} ${operator} ${right}`;
+    }
+    else if (statement instanceof Expr.Variable) {
+      return camelCase(statement.name.lexeme);
+    }
+    else if (statement instanceof Record) {
+      let tokens: string[] = [];
+      let output: string;
+
+      if (!statement.exposed) tokens.push("internal");
+      tokens.push("data", "class", pascalCase(statement.name.lexeme));
+      tokens.push("(");
+      output = tokens.join(" ") + newline;
+
+      const fields = statement.fields.map(
+        (field) => tab + `val ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)}`
+      ).join("," + newline);
+      output += fields + newline;
+
+      output += ')';
+      return output;
+    }
+    else if (statement instanceof Stmt.Expression) {
+      return this.visit(statement.expression);
+    }
+    else if (statement instanceof Expr.Assign) {
+      return `${camelCase(statement.name.lexeme)} = ${this.visit(statement.value)}`;
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
