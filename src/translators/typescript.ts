@@ -45,13 +45,11 @@ export class TranslatorTS {
     if (statement instanceof Function) {
       if (!statement.exposed) return noop;
 
-      let output = `export function ${camelCase(statement.name.lexeme)} (`; // function name
-      for (let i = 0; i < statement.params.length; i++) {
-        const param = statement.params[i];
-        output += `${camelCase(param.name.lexeme)}: ${this.type(param.type.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
-      }
-
-      output += `): ${this.type(statement.returnType.lexeme)};` + newline;
+      let output = `declare const ${camelCase(statement.name.lexeme)}: (`;
+      output += statement.params.map(
+        (param) => `${camelCase(param.name.lexeme)}: ${this.type(param.type.lexeme)}`
+      ).join(", ");
+      output += `) => ${this.type(statement.returnType.lexeme)};` + newline;
 
       return output;
     }
@@ -65,11 +63,10 @@ export class TranslatorTS {
       if (!statement.exposed) return noop;
 
       const className = pascalCase(statement.name.lexeme);
-      let output = `export class ${className} {` + newline;
+      let output = `declare class ${className} {` + newline;
 
       for (const field of statement.fields) {
-        const visibility = field.visibility ? field.visibility.lexeme : "public";
-        output += tab + `${visibility} ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)};` + newline;
+        output += tab + `public ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)};` + newline;
       }
 
       output += tab + "constructor (";
@@ -81,6 +78,12 @@ export class TranslatorTS {
 
       output += '}';
       return output;
+    }
+    else if (statement instanceof Stmt.Expression) {
+      return this.visit(statement.expression);
+    }
+    else if (statement instanceof Expr.Assign) {
+      return noop;
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
