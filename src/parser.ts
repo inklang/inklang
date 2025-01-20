@@ -113,6 +113,8 @@ export class Parser {
   private variableDeclaration (): Variable {
     const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
     this.consume(TokenType.COLON, "expect ':' after variable name.");
+
+    const isAnnotationType = this.match(TokenType.AT);
     const type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
 
     let initializer: Expr | null = null;
@@ -121,7 +123,7 @@ export class Parser {
     }
 
     this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
-    return new Variable(name, type, initializer);
+    return new Variable(name, type, isAnnotationType, initializer);
   }
 
   private whileStatement (): Stmt {

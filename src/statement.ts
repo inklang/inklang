@@ -51,6 +51,7 @@ export class Variable extends Stmt {
   public constructor (
     public readonly name: Token,
     public readonly type: Token,
+    public readonly isAnnotationType: boolean,
     public readonly initializer: Expr | null
   ) { super() }
 }
