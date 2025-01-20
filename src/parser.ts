@@ -46,16 +46,11 @@ export class Parser {
 
     const fields: Array<RecordField> = [];
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
-      let visibility: Token | null = null;
-      if (this.match(TokenType.PRIVATE, TokenType.PUBLIC)) {
-        visibility = this.previous();
-      };
-
       const field = this.consume(TokenType.IDENTIFIER, "expect field name.");
       this.consume(TokenType.COLON, "expect ':' after field name.");
       const type = this.consume(TokenType.IDENTIFIER, "expect field type.");
 
-      fields.push(new RecordField(field, type, visibility));
+      fields.push(new RecordField(field, type));
     }
 
     this.consume(TokenType.RBRACE, "expect '}' after record fields.");
@@ -117,6 +112,8 @@ export class Parser {
 
   private variableDeclaration (): Variable {
     const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
+    this.consume(TokenType.COLON, "expect ':' after variable name.");
+    const type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
 
     let initializer: Expr | null = null;
     if (this.match(TokenType.EQUAL)) {
@@ -124,7 +121,7 @@ export class Parser {
     }
 
     this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
-    return new Variable(name, initializer);
+    return new Variable(name, type, initializer);
   }
 
   private whileStatement (): Stmt {
