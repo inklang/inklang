@@ -51,7 +51,7 @@ export default abstract class Expr {
 
   public static readonly Call = class Call extends Expr {
     public constructor (
-      public readonly callee: Expr,
+      public readonly callee: Expr | AnnotationExpr,
       public readonly paren: Token,
       public readonly args: Array<Expr>,
       public readonly annotation: boolean,
@@ -72,4 +72,11 @@ export default abstract class Expr {
       public readonly value: Expr
     ) { super() }
   }
+}
+
+export class AnnotationExpr extends Expr {
+  public constructor (
+    public readonly namespace: Token,
+    public readonly property: Token,
+  ) { super() }
 }

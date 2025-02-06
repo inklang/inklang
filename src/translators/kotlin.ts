@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { camelCase } from "change-case";
 
 import Expr from "../expression";
-import Stmt, { Function, Record, Variable } from "../statement";
+import Stmt, { Function, RecordStmt, Variable } from "../statement";
 import { pascalCase } from "change-case";
 
 const tab = "  ";
@@ -100,7 +100,7 @@ export class TranslatorKotlin {
     else if (statement instanceof Expr.Variable) {
       return camelCase(statement.name.lexeme);
     }
-    else if (statement instanceof Record) {
+    else if (statement instanceof RecordStmt) {
       let tokens: string[] = [];
       let output: string;
 

@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import { camelCase, pascalCase } from "change-case";
 
-import Expr from "../expression";
-import Stmt, { Function, Record, Variable } from "../statement";
+import Expr, { AnnotationExpr } from "../expression";
+import Stmt, { Function, RecordStmt, Variable } from "../statement";
 
 const tab = "  ";
 const newline = "\n";
@@ -13,10 +13,69 @@ export class TranslatorJS {
     private readonly type: "cjs" | "mjs"
   ) {}
 
+  /**
+   * Used to keep track of the necessary imports.
+   * - See `this.translateImports` for the translation to JS code.
+   * - See `this.import` for adding new imports. 
+   */
+  private imports: Record<string, Set<string>> = {};
+
   public translate (): string {
-    return this.statements.map(
+    // We cleanup the necessary imports.
+    this.imports = {};
+
+    // We start by translating the statements.
+    const statements = this.statements.map(
       (statement) => this.visit(statement)
-    ).join('\n');
+    )
+
+    // We then join the imports and statements with a newline.
+    // We introduce a separator between the imports and the statements for better readability.
+    return [...this.translateImports(), "", ...statements].join(newline);
+  }
+
+  private import (namespace: string, fnOrProperty: string): void {
+    if (!this.imports[namespace]) {
+      this.imports[namespace] = new Set([fnOrProperty]);
+    }
+    else {
+      this.imports[namespace].add(fnOrProperty);
+    }
+  }
+
+  /**
+   * Used at the end of the translation.
+   * Makes sure to import all the necessary functions and properties.
+   * We also rename them to avoid conflicts and match the prefixed ones in the code.
+   */
+  private translateImports (): string[] {
+    const imports: string[] = [];
+
+    for (const [namespace, raw] of Object.entries(this.imports)) {
+      if (this.type === "cjs") {
+        const prefixed = Array.from(raw).map(fnOrProperty => {
+          return `${fnOrProperty}: ${this.annotation(namespace, fnOrProperty)}`;
+        });
+
+        imports.push(`const { ${prefixed.join(", ")} } = require("@inklang/${namespace}");`);
+      }
+      else if (this.type === "mjs") {
+        const prefixed = Array.from(raw).map(fnOrProperty => {
+          return `${fnOrProperty} as ${this.annotation(namespace, fnOrProperty)}`;
+        });
+
+        imports.push(`import { ${prefixed.join(", ")} } from "@inklang/${namespace}";`);
+      }
+    }
+
+    return imports;
+  }
+
+  /**
+   * Prefixed name for the annotation to avoid conflicts.
+   */
+  private annotation (namespace: string, fnOrProperty: string): string {
+    return "_inklang__" + namespace + "_" + fnOrProperty;
   }
 
   private visit (statement: Stmt): string {
@@ -78,7 +137,7 @@ export class TranslatorJS {
     else if (statement instanceof Expr.Variable) {
       return camelCase(statement.name.lexeme);
     }
-    else if (statement instanceof Record) {
+    else if (statement instanceof RecordStmt) {
       let output = "";
 
       if (statement.exposed && this.type === "mjs") {
@@ -121,21 +180,22 @@ export class TranslatorJS {
     else if (statement instanceof Expr.Assign) {
       return `${camelCase(statement.name.lexeme)} = ${this.visit(statement.value)};`;
     }
+    else if (statement instanceof Expr.Call) {
+      const callee = this.visit(statement.callee);
+      const args = statement.args.map((arg) => this.visit(arg)).join(", ");
+      return `${callee}(${args})`;
+    }
+    else if (statement instanceof AnnotationExpr) {
+      const namespace = camelCase(statement.namespace.lexeme);
+      const fnOrProperty = camelCase(statement.property.lexeme);
+
+      // Add it to the imports property so we make sure to import it in the code at the end.
+      this.import(namespace, fnOrProperty);
+
+      // We use a prefixed name to avoid conflicts with other variables.
+      return this.annotation(namespace, fnOrProperty)
+    }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
-  }
-
-  private fileExtension (): string {
-    switch (this.type) {
-      case "cjs":
-        return "js";
-      case "mjs":
-        return "mjs";
-    }
-  }
-
-  public async execute (): Promise<void> {
-    await fs.mkdir(`target/javascript`, { recursive: true });
-    await fs.writeFile(`target/javascript/lib.${this.fileExtension()}`, this.translate());
   }
 }

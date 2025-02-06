@@ -1,5 +1,5 @@
-import Expr from "./expression";
-import Stmt, { Function, FunctionParameter, Record, RecordField, Variable, While } from "./statement";
+import Expr, { AnnotationExpr } from "./expression";
+import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While } from "./statement";
 import { Token, TokenType } from "./token";
 
 export class Parser {
@@ -13,7 +13,7 @@ export class Parser {
       const statement = this.declaration();
       statements.push(statement);
     }
-
+    
     return statements;
   }
 
@@ -40,7 +40,7 @@ export class Parser {
     return this.statement();
   }
 
-  private recordDeclaration (exposed: boolean): Record {
+  private recordDeclaration (exposed: boolean): RecordStmt {
     const name = this.consume(TokenType.IDENTIFIER, "expect record name.");
     this.consume(TokenType.LBRACE, "expect '{' after record name.");
 
@@ -54,7 +54,7 @@ export class Parser {
     }
 
     this.consume(TokenType.RBRACE, "expect '}' after record fields.");
-    return new Record(name, fields, exposed);
+    return new RecordStmt(name, fields, exposed);
   }
 
   private statement (): Stmt {
@@ -115,7 +115,14 @@ export class Parser {
     this.consume(TokenType.COLON, "expect ':' after variable name.");
 
     const isAnnotationType = this.match(TokenType.AT);
-    const type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
+    let type: Token | AnnotationExpr;
+    
+    if (!isAnnotationType) {
+      type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
+    }
+    else {
+      type = this.annotation(false) as AnnotationExpr;
+    }
 
     let initializer: Expr | null = null;
     if (this.match(TokenType.EQUAL)) {
@@ -123,7 +130,7 @@ export class Parser {
     }
 
     this.consume(TokenType.SEMICOLON, "expect ';' after variable declaration.");
-    return new Variable(name, type, isAnnotationType, initializer);
+    return new Variable(name, type, initializer);
   }
 
   private whileStatement (): Stmt {
@@ -318,8 +325,7 @@ export class Parser {
 			} while (this.match(TokenType.COMMA));
 		}
 
-		const paren = this.consume(TokenType.RPAREN, "expect ')' after arguments.") as Token;
-
+		const paren = this.consume(TokenType.RPAREN, "expect ')' after arguments.");
 		return new Expr.Call(callee, paren, args, annotation);
 	}
 
@@ -342,6 +348,33 @@ export class Parser {
 		return expression;
 	}
 
+  /**
+   * An annotation is a special type of call or identifier that is used to
+   * call a language native feature.
+   * 
+   * ```ink
+   * var headers: @http::headers = @http::create_headers();
+   * @http::append_header(headers, "Content-Type", "application/json");
+   * ```
+   */
+  private annotation (allowFnCallMatch = true): Expr | AnnotationExpr {
+    const namespace = this.consume(TokenType.IDENTIFIER, "expect namespace after '@'.");
+    this.consume(TokenType.COLON, "expect a double ':' after namespace.");
+    this.consume(TokenType.COLON, "expect a double ':' after namespace.");
+    const property = this.consume(TokenType.IDENTIFIER, "expect property after namespace.");
+
+    if (this.match(TokenType.LPAREN)) {
+      if (allowFnCallMatch) {
+        return this.finishCall(new AnnotationExpr(namespace, property), true);
+      }
+      else {
+        throw this.error(this.peek(), "annotation call not supported in this context.");
+      }
+    }
+
+    return new AnnotationExpr(namespace, property);
+  }
+
   private primary (): Expr {
     if (this.match(TokenType.FALSE)) return new Expr.Literal(false);
     if (this.match(TokenType.TRUE)) return new Expr.Literal(true);
@@ -362,7 +395,7 @@ export class Parser {
     }
 
     if (this.match(TokenType.AT)) {
-      return this.call(true);
+      return this.annotation();
     }
 
     throw this.error(this.peek(), "expect expression.");

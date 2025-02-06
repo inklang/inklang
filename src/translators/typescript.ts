@@ -1,8 +1,7 @@
-import fs from "node:fs/promises";
 import { camelCase } from "change-case";
 
 import Expr from "../expression";
-import Stmt, { Function, Record, Variable } from "../statement";
+import Stmt, { Function, RecordStmt, Variable } from "../statement";
 import { pascalCase } from "change-case";
 
 const tab = "  ";
@@ -59,7 +58,7 @@ export class TranslatorTS {
     else if (statement instanceof Expr.Literal) {
       return noop;
     }
-    else if (statement instanceof Record) {
+    else if (statement instanceof RecordStmt) {
       if (!statement.exposed) return noop;
 
       const className = pascalCase(statement.name.lexeme);
@@ -87,10 +86,5 @@ export class TranslatorTS {
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
-  }
-
-  public async execute (): Promise<void> {
-    await fs.mkdir(`target/javascript`, { recursive: true });
-    await fs.writeFile("target/javascript/lib.d.ts", this.translate());
   }
 }

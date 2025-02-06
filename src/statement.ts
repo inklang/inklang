@@ -1,4 +1,5 @@
 import type Expr from "./expression"
+import { AnnotationExpr } from "./expression"
 import { Token } from "./token"
 
 export default abstract class Stmt {
@@ -50,13 +51,12 @@ export class FunctionParameter extends Stmt {
 export class Variable extends Stmt {
   public constructor (
     public readonly name: Token,
-    public readonly type: Token,
-    public readonly isAnnotationType: boolean,
+    public readonly type: Token | AnnotationExpr,
     public readonly initializer: Expr | null
   ) { super() }
 }
 
-export class Record extends Stmt {
+export class RecordStmt extends Stmt {
   public constructor (
     public readonly name: Token,
     public readonly fields: Array<RecordField>,
