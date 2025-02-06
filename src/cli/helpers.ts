@@ -9,11 +9,15 @@ export interface InkJSON {
   git: string;
 }
 
-export async function readInkJSON (): Promise<InkJSON> {
-  const inkJSON = await fs.readFile('ink.json', 'utf8');
-  return JSON.parse(inkJSON);
+export async function readTextFile (path: string): Promise<string> {
+  return fs.readFile(path, "utf8");
 }
 
+export async function readInkJSON (): Promise<InkJSON> {
+  return JSON.parse(await readTextFile('ink.json'));
+}
+
+/** writes to a file directly, overwriting previous content. */
 export async function write (path: string, content: string): Promise<void> {
   await fs.writeFile(path, content);
 }
@@ -25,4 +29,9 @@ export async function execute (command: string, args: string[]): Promise<void> {
     child.on('error', reject);
     child.on('exit', resolve);
   });
+}
+
+/** creates a folder recursively and ignore if already exists. */
+export async function mkdir (path: string): Promise<void> {
+  await fs.mkdir(path, { recursive: true }).catch(() => void 0);
 }

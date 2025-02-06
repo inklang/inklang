@@ -1,9 +1,8 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 
 import { syncKotlin, syncJavaScript, syncRepository } from "./cli/sync";
 import { parse, TranslatorJS, TranslatorKotlin, TranslatorTS } from "./index";
-import { readInkJSON, write } from "./cli/helpers";
+import { mkdir, readInkJSON, readTextFile, write } from "./cli/helpers";
 
 async function main () {
   const args = process.argv.slice(2);
@@ -18,7 +17,7 @@ async function main () {
     }
     case "generate": {
       const entrypoint = path.resolve("./src/main.ink");
-      const code = await fs.readFile(entrypoint, "utf8");
+      const code = await readTextFile(entrypoint);
       const statements = parse(code, entrypoint);
 
       switch (args.shift()) {
@@ -27,7 +26,7 @@ async function main () {
           const mjs = new TranslatorJS(statements, "mjs").translate();
           const dts = new TranslatorTS(statements).translate();
 
-          await fs.mkdir("generated/javascript", { recursive: true });
+          await mkdir("generated/javascript");
           await write("generated/javascript/index.cjs", cjs);
           await write("generated/javascript/index.mjs", mjs);
           await write("generated/javascript/index.d.ts", dts);
@@ -41,7 +40,7 @@ async function main () {
           const libSubPath = inkJSON.package.replace(/\./g, "/");
 
           const libDir = `generated/kotlin/src/main/${libSubPath}`;
-          await fs.mkdir(libDir, { recursive: true });
+          await mkdir(libDir);
 
           await write(`${libDir}/${inkJSON.displayName}.kt`, code);
           await write("generated/kotlin/build.gradle.kts", `
@@ -70,6 +69,11 @@ java {
           throw new Error(`unknown language: javascript, kotlin`);
         }
       }
+
+      break;
+    }
+    default: {
+      throw new Error(`unknown command, available: sync, generate`);
     }
   }
 }
