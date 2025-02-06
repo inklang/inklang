@@ -2,20 +2,19 @@
 
 ## Warnings
 
-Hold on ! This is a huge work in progress where features and supported target languages depends on expectations from LiterateInk librairies.
-
-This language is not really meant to be used outside of LiterateInk.
-For now, we’re only interested in translating to JavaScript, Kotlin and Swift.
+**Hold on !** This is a huge work in progress where features and supported languages
+depending on expectations from Literate. This may change after the first major release.
+For now, we’re only interested in translating to JavaScript and Kotlin but Swift support should come soon.
 
 ## Motivation
 
-At LiterateInk, we want to support multiple languages to provide support for all platforms.
+At [LiterateInk](https://literate.ink), we're writing librairies targetting multiple languages to provide support for most platforms.
 
-We notably need a JS version for [Papillon](https://github.com/PapillonApp/Papillon), a Kotlin version for our Literate app on Android and a Swift version for our Literate app on iOS !
+For example, we absolutely need a JavaScript version for [Papillon](https://papillon.bzh), a Kotlin version for [Literate Android](https://github.com/LiterateInk/LiterateAndroid) and a Swift version for [Literate iOS](https://github.com/LiterateInk/LiterateIOS).
 
-Before, we had a Rust structure with `uniffi-rs` for Kotlin and Swift, and `wasm-bindgen` for the WASM (so basically JS)
+Before, we had a Rust structure with [`uniffi-rs`](https://github.com/mozilla/uniffi-rs) for Kotlin and Swift paired with `wasm-bindgen` to provide JavaScript bindings through WASM.
 
-We ran into an issue where React Native was **NOT supporting WASM**, and even plugins to support it were doing nothing. To prevent this, we decided to move on and rewrite the library to JS for Papillon users. Was not really fun to do since we had to manage multiple codebases at once now, literally the issue we tried to prevent by doing this all architecture…
+We ran into an issue where [React Native](https://github.com/facebook/react-native) was **NOT supporting WASM**, and even plugins to support it were doing nothing. To prevent this, we decided to move on and rewrite the library to JavaScript for Papillon. It was not a really fun process since we had to manage multiple codebases at once.
 
 ## What is inklang ?
 
