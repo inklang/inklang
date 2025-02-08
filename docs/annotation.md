@@ -3,6 +3,8 @@
 Annotations are like macros that translates the code differently depending on the language.
 They can only be used as type or function calls.
 
+> If you're looking for available annotations, check the [annotations directory](./annotations).
+
 ## Why ?
 
 There' so many different ways to do the same thing in different languages.
@@ -19,6 +21,8 @@ var something: @namespace::type_property;
 ```
 
 ## Example
+
+Let's use the [`http` annotation](./annotations/http.md) to create a new headers object.
 
 ```ink
 var headers: @http::headers = @http::create_headers();
