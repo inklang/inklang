@@ -3,7 +3,7 @@
 ## Warnings
 
 **Hold on !** This is a huge work in progress where features and supported languages
-depending on expectations from Literate. This may change after the first major release.
+depending on expectations from [Literate](https://literate.ink). This may change after the first major release.
 For now, we’re only interested in translating to JavaScript and Kotlin but Swift support should come soon.
 
 ## Motivation

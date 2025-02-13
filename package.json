@@ -1,8 +1,8 @@
 {
   "name": "inklang",
   "version": "0.0.0",
-  "description": "",
-  "author": "LiterateInk",
+  "description": "Write once, transpile anywhere.",
+  "author": "Mikkel ALMONTE--RINGAUD <contact@vexcited.com>",
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "^1.1.17"
