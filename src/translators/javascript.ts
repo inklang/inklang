@@ -75,7 +75,7 @@ export class TranslatorJS {
    * Prefixed name for the annotation to avoid conflicts.
    */
   private annotation (namespace: string, fnOrProperty: string): string {
-    return "_inklang__" + namespace + "_" + fnOrProperty;
+    return "inklang__" + namespace + "_" + fnOrProperty;
   }
 
   private visit (statement: Stmt): string {
