@@ -11,7 +11,6 @@
 //   return "bruh" + aa + something;
 // }
 
-expose function make_sum_request () -> void {
-  var headers: @http::headers = @http::create_headers();
+expose function append_json_to_header (headers: @http::headers) -> void {
   @http::append_header(headers, "Content-Type", "application/json");
 }
