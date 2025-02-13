@@ -114,12 +114,15 @@ export class Parser {
     const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
     this.consume(TokenType.COLON, "expect ':' after variable name.");
 
-    const isAnnotationType = this.match(TokenType.AT);
     let type: Token | AnnotationExpr;
     
-    if (!isAnnotationType) {
+    // var a: int;
+    //        ^^^
+    if (!this.match(TokenType.AT)) {
       type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
     }
+    // var a: @http::headers;
+    //        ^^^^^^^^^^^^^^
     else {
       type = this.annotation(false) as AnnotationExpr;
     }
@@ -168,9 +171,18 @@ export class Parser {
         //                      ^
         this.consume(TokenType.COLON, "expect colon for parameter type.")
 
+        let type: Token | AnnotationExpr;
+    
         // function something (a: int, b: int) -> type {}
         //                        ^^^
-        const type = this.consume(TokenType.IDENTIFIER, "expect parameter type.")
+        if (!this.match(TokenType.AT)) {
+          type = this.consume(TokenType.IDENTIFIER, "expect parameter type.");
+        }
+        // function something (a: @http::headers, b: int) -> type {}
+        //                        ^^^^^^^^^^^^^^
+        else {
+          type = this.annotation(false) as AnnotationExpr;
+        }
 
         parameters.push(new FunctionParameter(name, type));
       }

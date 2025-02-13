@@ -1,20 +1,73 @@
 import { camelCase } from "change-case";
 
-import Expr from "../expression";
+import Expr, { AnnotationExpr } from "../expression";
 import Stmt, { Function, RecordStmt, Variable } from "../statement";
 import { pascalCase } from "change-case";
+import { Token } from "../token";
 
 const tab = "  ";
 const noop = "";
 const newline = "\n";
 
 export class TranslatorTS {
-  public constructor (private readonly statements: Array<Stmt>) {}
+  public constructor (
+    private readonly statements: Array<Stmt>
+  ) {}
+
+  /**
+   * Used to keep track of the necessary imports.
+   * - See `this.translateImports` for the translation to JS code.
+   * - See `this.import` for adding new imports. 
+   */
+  private imports: Record<string, Set<string>> = {};
 
   public translate (): string {
-    return this.statements.map(
+    // We cleanup the necessary imports.
+    this.imports = {};
+
+    // We start by translating the statements.
+    const statements = this.statements.map(
       (statement) => this.visit(statement)
-    ).join('\n');
+    )
+
+    // We then join the imports and statements with a newline.
+    // We introduce a separator between the imports and the statements for better readability.
+    return [...this.translateImports(), "", ...statements].join(newline);
+  }
+
+  private import (namespace: string, fnOrProperty: string): void {
+    if (!this.imports[namespace]) {
+      this.imports[namespace] = new Set([fnOrProperty]);
+    }
+    else {
+      this.imports[namespace].add(fnOrProperty);
+    }
+  }
+
+  /**
+   * Used at the end of the translation.
+   * Makes sure to import all the necessary functions and properties.
+   * We also rename them to avoid conflicts and match the prefixed ones in the code.
+   */
+  private translateImports (): string[] {
+    const imports: string[] = [];
+
+    for (const [namespace, raw] of Object.entries(this.imports)) {
+      const prefixed = Array.from(raw).map(fnOrProperty => {
+        return `${fnOrProperty} as ${this.annotation(namespace, fnOrProperty)}`;
+      });
+
+      imports.push(`import type { ${prefixed.join(", ")} } from "@inklang/${namespace}";`);
+    }
+
+    return imports;
+  }
+
+  /**
+   * Prefixed name for the annotation to avoid conflicts.
+   */
+  private annotation (namespace: string, fnOrProperty: string): string {
+    return "Inklang__" + namespace + "_" + fnOrProperty;
   }
 
   private type (lexeme: string): string {
@@ -34,7 +87,7 @@ export class TranslatorTS {
         type = lexeme;
         break;
       default:
-        throw new Error(`unknown variable type '${lexeme}'`);
+        throw new Error(`unknown generic variable type '${lexeme}'`);
     }
 
     return type;
@@ -45,9 +98,11 @@ export class TranslatorTS {
       if (!statement.exposed) return noop;
 
       let output = `declare const ${camelCase(statement.name.lexeme)}: (`;
-      output += statement.params.map(
-        (param) => `${camelCase(param.name.lexeme)}: ${this.type(param.type.lexeme)}`
-      ).join(", ");
+      output += statement.params.map((param) => `${camelCase(param.name.lexeme)}: ${
+        param.type instanceof Token
+          ? this.type(param.type.lexeme)
+          : this.visit(param.type)
+      }`).join(", ");
       output += `) => ${this.type(statement.returnType.lexeme)};` + newline;
 
       return output;
@@ -83,6 +138,16 @@ export class TranslatorTS {
     }
     else if (statement instanceof Expr.Assign) {
       return noop;
+    }
+    else if (statement instanceof AnnotationExpr) {
+      const namespace = camelCase(statement.namespace.lexeme);
+      const fnOrProperty = pascalCase(statement.property.lexeme);
+
+      // Add it to the imports property so we make sure to import it in the code at the end.
+      this.import(namespace, fnOrProperty);
+
+      // We use a prefixed name to avoid conflicts with other variables.
+      return this.annotation(namespace, fnOrProperty)
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);

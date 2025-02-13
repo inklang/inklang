@@ -44,7 +44,7 @@ export class Function extends Stmt {
 export class FunctionParameter extends Stmt {
   public constructor (
     public readonly name: Token,
-    public readonly type: Token,
+    public readonly type: Token | AnnotationExpr,
   ) { super() }
 }
 
