@@ -36,7 +36,7 @@ export class Function extends Stmt {
     public readonly name: Token,
     public readonly params: Array<FunctionParameter>,
     public readonly body: Array<Stmt>,
-    public readonly returnType: Token,
+    public readonly returnType: Token | AnnotationExpr,
     public readonly exposed: boolean
   ) { super() }
 }

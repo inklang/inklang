@@ -13,7 +13,7 @@ export class Parser {
       const statement = this.declaration();
       statements.push(statement);
     }
-    
+
     return statements;
   }
 
@@ -115,7 +115,7 @@ export class Parser {
     this.consume(TokenType.COLON, "expect ':' after variable name.");
 
     let type: Token | AnnotationExpr;
-    
+
     // var a: int;
     //        ^^^
     if (!this.match(TokenType.AT)) {
@@ -172,7 +172,7 @@ export class Parser {
         this.consume(TokenType.COLON, "expect colon for parameter type.")
 
         let type: Token | AnnotationExpr;
-    
+
         // function something (a: int, b: int) -> type {}
         //                        ^^^
         if (!this.match(TokenType.AT)) {
@@ -200,9 +200,18 @@ export class Parser {
     //                                     ^^
     this.consume(TokenType.RARROW, "expect '->' to define function return type.");
 
+    let returnType: Token | AnnotationExpr;
+
     // function something (a: int, b: int) -> type {}
     //                                        ^^^^
-    const returnType = this.consume(TokenType.IDENTIFIER, "expect return type.");
+    if (!this.match(TokenType.AT)) {
+      returnType = this.consume(TokenType.IDENTIFIER, "expect return type.");
+    }
+    // function something (a: int, b: int) -> @http::headers {}
+    //                                        ^^^^^^^^^^^^^^
+    else {
+      returnType = this.annotation(false) as AnnotationExpr;
+    }
 
     // function something (a: int, b: int) -> type {}
     //                                             ^
@@ -363,7 +372,7 @@ export class Parser {
   /**
    * An annotation is a special type of call or identifier that is used to
    * call a language native feature.
-   * 
+   *
    * ```ink
    * var headers: @http::headers = @http::create_headers();
    * @http::append_header(headers, "Content-Type", "application/json");
