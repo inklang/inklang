@@ -2,6 +2,7 @@ import { readInkJSON, write, execute } from "./helpers";
 
 export async function syncRepository (): Promise<void> {
   await write(".gitignore", `
+node_modules/
 .gradle/
 build/
   `.trim());
