@@ -103,7 +103,11 @@ export class TranslatorTS {
           ? this.type(param.type.lexeme)
           : this.visit(param.type)
       }`).join(", ");
-      output += `) => ${this.type(statement.returnType.lexeme)};` + newline;
+      output += `) => ${
+        statement.returnType instanceof Token
+          ? this.type(statement.returnType.lexeme)
+          : this.visit(statement.returnType)
+        };` + newline;
 
       return output;
     }
