@@ -17,7 +17,7 @@ export class TranslatorTS {
   /**
    * Used to keep track of the necessary imports.
    * - See `this.translateImports` for the translation to JS code.
-   * - See `this.import` for adding new imports. 
+   * - See `this.import` for adding new imports.
    */
   private imports: Record<string, Set<string>> = {};
 
@@ -97,7 +97,7 @@ export class TranslatorTS {
     if (statement instanceof Function) {
       if (!statement.exposed) return noop;
 
-      let output = `declare const ${camelCase(statement.name.lexeme)}: (`;
+      let output = `export const ${camelCase(statement.name.lexeme)}: (`;
       output += statement.params.map((param) => `${camelCase(param.name.lexeme)}: ${
         param.type instanceof Token
           ? this.type(param.type.lexeme)
@@ -117,7 +117,7 @@ export class TranslatorTS {
       if (!statement.exposed) return noop;
 
       const className = pascalCase(statement.name.lexeme);
-      let output = `declare class ${className} {` + newline;
+      let output = `export class ${className} {` + newline;
 
       for (const field of statement.fields) {
         output += tab + `public ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)};` + newline;
