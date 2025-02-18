@@ -2,11 +2,16 @@ import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 
 export interface InkJSON {
-  version: string;
   name: string;
   displayName: string;
+  description: string;
   package: string;
+  version: string;
   git: string;
+  /**
+   * List of annotations used in the code (eg.: `@http::headers` is from `http`).
+   */
+  annotations: string[];
 }
 
 export async function readTextFile (path: string): Promise<string> {

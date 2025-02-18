@@ -56,13 +56,14 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 }
 
 export async function syncJavaScript (): Promise<void> {
-  const inkJSON = await readInkJSON();
+  const ink = await readInkJSON();
 
   // Generate the package.json file.
   await write("package.json", JSON.stringify({
-    name: inkJSON.name,
-    version: inkJSON.version,
-    repository: inkJSON.git,
+    name: ink.name,
+    version: ink.version,
+    repository: ink.git,
+    description: ink.description,
     sideEffects: false,
     main: "./generated/javascript/index.cjs",
     module: "./generated/javascript/index.mjs",
@@ -78,4 +79,32 @@ export async function syncJavaScript (): Promise<void> {
     dependencies: {},
     devDependencies: {}
   }, null, 2));
+
+  await execute("pnpm", ["add", "-D", "typescript@latest"]);
+
+  await write("tsconfig.json", JSON.stringify({
+    compilerOptions: {
+      target: "ESNext",
+      module: "ESNext",
+      moduleResolution: "Bundler",
+
+      strict: true,
+      noEmit: true,
+      skipLibCheck: true,
+
+      baseUrl: ".",
+      paths: {
+        [ink.name]: ["generated/javascript"],
+      },
+
+      isolatedModules: true,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true
+    },
+
+    include: ["examples/javascript", "generated/javascript"],
+    exclude: ["node_modules"]
+  }, null, 2));
+
+  await execute("pnpm", ["add", ...ink.annotations.map((annotation) => `@inklang/${annotation}@latest`)]);
 }
