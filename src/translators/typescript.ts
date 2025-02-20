@@ -82,6 +82,7 @@ export class TranslatorTS {
       case "f64":
         type = "number";
         break;
+      case "boolean":
       case "string":
       case "void":
         type = lexeme;
