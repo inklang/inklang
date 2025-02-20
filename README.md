@@ -24,7 +24,6 @@ It is designed to be simple and easy to use.
 ## Learn
 
 You can start by heading to the [`./docs`](./docs/) directory.
-If you prefer learning with examples, you can take a quick look to the [`./examples`](./examples/) directory.
 
 ## Resources & Credits
 

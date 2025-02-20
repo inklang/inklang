@@ -1,7 +1,0 @@
-{
-  "version": "0.0.0",
-  "name": "fetchdemo",
-  "displayName": "FetchDemo",
-  "package": "ink.lang.demo.fetch",
-  "git": "https://github.com/inklang/inklang"
-}
