@@ -29,12 +29,15 @@ export class Parser {
       return this.functionDeclaration(exposed, async);
     }
 
-    if (exposed || async)
-      throw this.error(this.peek(), "only functions can be exposed or async.");
-
+    if (async)
+      throw this.error(this.peek(), "only functions can be async.");
+    
     if (this.match(TokenType.RECORD)) {
       return this.recordDeclaration(exposed);
     }
+
+    if (exposed || async)
+      throw this.error(this.peek(), "only functions and records can be exposed.");
 
     if (this.match(TokenType.VAR)) {
       return this.variableDeclaration();
