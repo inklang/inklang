@@ -201,6 +201,12 @@ export class TranslatorJS {
       // We use a prefixed name to avoid conflicts with other variables.
       return this.annotation(namespace, fnOrProperty)
     }
+    else if (statement instanceof Expr.Get) {
+      const object = this.visit(statement.object);
+      const name = statement.name.lexeme;
+
+      return `${object}.${name}`;
+    }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
   }
