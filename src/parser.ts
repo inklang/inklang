@@ -76,9 +76,16 @@ export class Parser {
     if (this.match(TokenType.WHILE)) {
       return this.whileStatement();
     }
-
     if (this.match(TokenType.LBRACE)) {
       return new Stmt.Block(this.block());
+    }
+
+    if (this.match(TokenType.IDENTIFIER)) {
+      if (this.match(TokenType.LBRACE)) {
+        return this.recordInstantiation();
+      }
+      // We need to go back one token to revert the `match` operation.
+      else this.current--;
     }
 
     return this.expressionStatement();
@@ -155,6 +162,10 @@ export class Parser {
     const value = this.expression();
     this.consume(TokenType.SEMICOLON, "expect ';' after expression.");
     return new Stmt.Expression(value);
+  }
+
+  private recordInstantiation (): Stmt {
+    throw this.error(this.peek(), "record instantiation not implemented yet.");
   }
 
   private functionDeclaration (exposed: boolean, async: boolean): Function {

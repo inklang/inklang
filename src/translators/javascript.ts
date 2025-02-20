@@ -19,6 +19,7 @@ export class TranslatorJS {
    * - See `this.import` for adding new imports. 
    */
   private imports: Record<string, Set<string>> = {};
+  private records: Array<RecordStmt> = [];
 
   public translate (): string {
     // We cleanup the necessary imports.
@@ -138,6 +139,8 @@ export class TranslatorJS {
       return camelCase(statement.name.lexeme);
     }
     else if (statement instanceof RecordStmt) {
+      this.records.push(statement);
+
       let output = "";
 
       if (statement.exposed && this.type === "mjs") {
