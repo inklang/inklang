@@ -23,14 +23,17 @@ export class Parser {
 
   private declaration (): Stmt {
     const exposed = this.match(TokenType.EXPOSE);
-    // TODO: async
+    const async = this.match(TokenType.ASYNC);
+
+    if (this.match(TokenType.FUNCTION)) {
+      return this.functionDeclaration(exposed, async);
+    }
+
+    if (exposed || async)
+      throw this.error(this.peek(), "only functions can be exposed or async.");
 
     if (this.match(TokenType.RECORD)) {
       return this.recordDeclaration(exposed);
-    }
-
-    if (this.match(TokenType.FUNCTION)) {
-      return this.functionDeclaration(exposed);
     }
 
     if (this.match(TokenType.VAR)) {
@@ -151,7 +154,7 @@ export class Parser {
     return new Stmt.Expression(value);
   }
 
-  private functionDeclaration (exposed: boolean): Function {
+  private functionDeclaration (exposed: boolean, async: boolean): Function {
     // function something (a: int, b: int) -> type {}
     //          ^^^^^^^^^
     const name = this.consume(TokenType.IDENTIFIER, "expect function name.");
@@ -220,7 +223,7 @@ export class Parser {
     // Will retrieve the function body and expect the `}` token.
     const body = this.block();
 
-    return new Function(name, parameters, body, returnType, exposed);
+    return new Function(name, parameters, body, returnType, exposed, async);
   }
 
   private block(): Array<Stmt> {
@@ -337,33 +340,53 @@ export class Parser {
     return this.call(false);
   }
 
-  private finishCall (callee: Expr, annotation: boolean): Expr {
+  /**
+   * Retrieves all the arguments from a function call
+   * and creates the function call expression.
+   */
+  private finishCall (callee: Expr, annotation: boolean, awaited: boolean): Expr {
 		const args: Array<Expr> = [];
 
+    // fn_call()
+    //         ^
 		if (!this.check(TokenType.RPAREN)) {
 			do {
+        // Each argument is an expression.
 				args.push(this.expression());
-			} while (this.match(TokenType.COMMA));
+			}
+      // fn_call(a, b, c)
+      //          ^  ^
+      // We iterate through all the arguments.
+      while (this.match(TokenType.COMMA));
 		}
 
 		const paren = this.consume(TokenType.RPAREN, "expect ')' after arguments.");
-		return new Expr.Call(callee, paren, args, annotation);
+		return new Expr.Call(callee, paren, args, annotation, awaited);
 	}
 
   private call (annotation: boolean): Expr {
+    // await fn_call()
+    // ^^^^^ (optional)
+    const awaited = this.previous().type === TokenType.AWAIT;
+    
+    // fn_call()
 		let expression = this.primary();
 
 		while (true) {
+      // fn_call()
+      //        ^
+      // We're done looking for `.` (getters) 
 			if (this.match(TokenType.LPAREN)) {
-				expression = this.finishCall(expression, annotation);
+				expression = this.finishCall(expression, annotation, awaited);
 			}
+      // my.struct.for.fn_call()
+      //   ^      ^   ^ (getters)
+      // Will iterate through all the getters.
       else if (this.match(TokenType.DOT)) {
         const name = this.consume(TokenType.IDENTIFIER, "expect property name after '.'.");
         expression = new Expr.Get(expression, name);
       }
-      else {
-        break;
-      }
+      else break;
 		}
 
 		return expression;
@@ -376,9 +399,12 @@ export class Parser {
    * ```ink
    * var headers: @http::headers = @http::create_headers();
    * @http::append_header(headers, "Content-Type", "application/json");
+   * await @http::send(request);
    * ```
    */
-  private annotation (allowFnCallMatch = true): Expr | AnnotationExpr {
+  private annotation (allowFnCallMatch: boolean): Expr | AnnotationExpr {
+    // (consumed TokenType.AT)
+
     const namespace = this.consume(TokenType.IDENTIFIER, "expect namespace after '@'.");
     this.consume(TokenType.COLON, "expect a double ':' after namespace.");
     this.consume(TokenType.COLON, "expect a double ':' after namespace.");
@@ -386,7 +412,9 @@ export class Parser {
 
     if (this.match(TokenType.LPAREN)) {
       if (allowFnCallMatch) {
-        return this.finishCall(new AnnotationExpr(namespace, property), true);
+        // (AWAIT), AT, IDENTIFIER, COLON, COLON, IDENTIFIER, LPAREN : 7 tokens before.
+        const awaited = this.previous(7).type === TokenType.AWAIT;
+        return this.finishCall(new AnnotationExpr(namespace, property), true, awaited);
       }
       else {
         throw this.error(this.peek(), "annotation call not supported in this context.");
@@ -416,7 +444,7 @@ export class Parser {
     }
 
     if (this.match(TokenType.AT)) {
-      return this.annotation();
+      return this.annotation(true);
     }
 
     throw this.error(this.peek(), "expect expression.");
@@ -457,8 +485,8 @@ export class Parser {
     return this.tokens[this.current];
   }
 
-  private previous (): Token {
-    return this.tokens[this.current - 1];
+  private previous (from = 1): Token {
+    return this.tokens[this.current - from];
   }
 
   private error (token: Token, message: string): Error {

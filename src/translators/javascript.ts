@@ -87,7 +87,7 @@ export class TranslatorJS {
       }
 
       const functionName = camelCase(statement.name.lexeme)
-      output += `const ${functionName} = (`;
+      output += `const ${functionName} = ${statement.async ? "async" : ""} (`;
       for (let i = 0; i < statement.params.length; i++) {
         const param = statement.params[i];
         output += `${camelCase(param.name.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
@@ -183,7 +183,13 @@ export class TranslatorJS {
     else if (statement instanceof Expr.Call) {
       const callee = this.visit(statement.callee);
       const args = statement.args.map((arg) => this.visit(arg)).join(", ");
-      return `${callee}(${args})`;
+      
+      let call = `${callee}(${args})`;
+      if (statement.awaited) {
+        call = `await ${call}`;
+      }
+
+      return call;
     }
     else if (statement instanceof AnnotationExpr) {
       const namespace = camelCase(statement.namespace.lexeme);

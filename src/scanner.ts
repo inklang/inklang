@@ -18,6 +18,9 @@ export class Scanner {
     ["public", TokenType.PUBLIC],
     ["private", TokenType.PRIVATE],
     ["expose", TokenType.EXPOSE],
+    
+    ["async", TokenType.ASYNC],
+    ["await", TokenType.AWAIT],
 
     ["if", TokenType.IF],
     ["else", TokenType.ELSE],

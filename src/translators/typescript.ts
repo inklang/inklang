@@ -97,17 +97,21 @@ export class TranslatorTS {
     if (statement instanceof Function) {
       if (!statement.exposed) return noop;
 
+      let returnType = statement.returnType instanceof Token
+        ? this.type(statement.returnType.lexeme)
+        : this.visit(statement.returnType);
+      
+      if (statement.exposed) {
+        returnType = `Promise<${returnType}>`;
+      }
+
       let output = `export const ${camelCase(statement.name.lexeme)}: (`;
       output += statement.params.map((param) => `${camelCase(param.name.lexeme)}: ${
         param.type instanceof Token
           ? this.type(param.type.lexeme)
           : this.visit(param.type)
       }`).join(", ");
-      output += `) => ${
-        statement.returnType instanceof Token
-          ? this.type(statement.returnType.lexeme)
-          : this.visit(statement.returnType)
-        };` + newline;
+      output += `) => ${returnType};` + newline;
 
       return output;
     }

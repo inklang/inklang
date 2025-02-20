@@ -55,6 +55,7 @@ export default abstract class Expr {
       public readonly paren: Token,
       public readonly args: Array<Expr>,
       public readonly annotation: boolean,
+      public readonly awaited: boolean,
     ) { super() }
   }
 

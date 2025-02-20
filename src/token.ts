@@ -44,6 +44,8 @@ export enum TokenType {
   RETURN,
   FUNCTION,
   EXPOSE,
+  ASYNC,
+  AWAIT,
   NULL,
 
   EOF
