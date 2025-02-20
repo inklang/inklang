@@ -367,7 +367,7 @@ export class Parser {
   private call (annotation: boolean): Expr {
     // await fn_call()
     // ^^^^^ (optional)
-    const awaited = this.previous().type === TokenType.AWAIT;
+    const awaited = this.match(TokenType.AWAIT);
     
     // fn_call()
 		let expression = this.primary();
