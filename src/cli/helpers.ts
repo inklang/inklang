@@ -29,7 +29,11 @@ export async function write (path: string, content: string): Promise<void> {
 
 export async function execute (command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' });
+    const child = spawn(command, args, {
+      stdio: 'inherit',
+      // https://stackoverflow.com/a/54515183/14642839
+      shell: process.platform === 'win32'
+    });
 
     child.on('error', reject);
     child.on('exit', resolve);
