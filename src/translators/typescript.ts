@@ -20,6 +20,7 @@ export class TranslatorTS {
    * - See `this.import` for adding new imports.
    */
   private imports: Record<string, Set<string>> = {};
+  private records: Set<string> = new Set();
 
   public translate (): string {
     // We cleanup the necessary imports.
@@ -87,8 +88,12 @@ export class TranslatorTS {
       case "void":
         type = lexeme;
         break;
-      default:
-        throw new Error(`unknown generic variable type '${lexeme}'`);
+      default: {
+        if (this.records.has(lexeme)) {
+          type = pascalCase(lexeme);
+        }
+        else throw new Error(`unknown generic variable type '${lexeme}'`);
+      }
     }
 
     return type;
@@ -101,8 +106,8 @@ export class TranslatorTS {
       let returnType = statement.returnType instanceof Token
         ? this.type(statement.returnType.lexeme)
         : this.visit(statement.returnType);
-      
-      if (statement.exposed) {
+
+      if (statement.async) {
         returnType = `Promise<${returnType}>`;
       }
 
@@ -123,6 +128,7 @@ export class TranslatorTS {
       return noop;
     }
     else if (statement instanceof RecordStmt) {
+      this.records.add(statement.name.lexeme);
       if (!statement.exposed) return noop;
 
       const className = pascalCase(statement.name.lexeme);

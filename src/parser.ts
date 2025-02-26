@@ -1,4 +1,4 @@
-import Expr, { AnnotationExpr } from "./expression";
+import Expr, { AnnotationExpr, RecordFieldExpr, RecordInstanciationExpr } from "./expression";
 import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While } from "./statement";
 import { Token, TokenType } from "./token";
 
@@ -18,6 +18,26 @@ export class Parser {
   }
 
   private expression (): Expr {
+    // TODO: move into a proper function
+    if (this.check(TokenType.IDENTIFIER) && this.tokens[this.current + 1].type === TokenType.LBRACE) {
+      const name = this.consume(TokenType.IDENTIFIER, "expected identifier for record instanciation.");
+      this.consume(TokenType.LBRACE, "expected '{' for record instanciation.");
+      const fields: Array<RecordFieldExpr> = [];
+
+      if (!this.check(TokenType.RBRACE)) {
+        do {
+          const name = this.consume(TokenType.IDENTIFIER, "expect parameter name.")
+          this.consume(TokenType.COLON, "expect colon for parameter type.")
+          const value = this.primary();
+          fields.push(new RecordFieldExpr(name, value));
+        }
+        while (this.match(TokenType.COMMA));
+      }
+
+      this.consume(TokenType.RBRACE, "expected '}' after record instanciation.");
+      return new RecordInstanciationExpr(name, fields);
+    }
+
     return this.assignment();
   }
 
@@ -31,7 +51,7 @@ export class Parser {
 
     if (async)
       throw this.error(this.peek(), "only functions can be async.");
-    
+
     if (this.match(TokenType.RECORD)) {
       return this.recordDeclaration(exposed);
     }
@@ -382,14 +402,14 @@ export class Parser {
     // await fn_call()
     // ^^^^^ (optional)
     const awaited = this.match(TokenType.AWAIT);
-    
+
     // fn_call()
 		let expression = this.primary();
 
 		while (true) {
       // fn_call()
       //        ^
-      // We're done looking for `.` (getters) 
+      // We're done looking for `.` (getters)
 			if (this.match(TokenType.LPAREN)) {
 				expression = this.finishCall(expression, annotation, awaited);
 			}

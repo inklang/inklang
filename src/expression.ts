@@ -81,3 +81,17 @@ export class AnnotationExpr extends Expr {
     public readonly property: Token,
   ) { super() }
 }
+
+export class RecordFieldExpr extends Expr {
+  public constructor (
+    public readonly name: Token,
+    public readonly value: Expr,
+  ) { super() }
+}
+
+export class RecordInstanciationExpr extends Expr {
+  public constructor (
+    public readonly name: Token,
+    public readonly fields: Array<RecordFieldExpr>,
+  ) { super() }
+}

@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import { camelCase, pascalCase } from "change-case";
 
-import Expr, { AnnotationExpr } from "../expression";
-import Stmt, { Function, RecordStmt, Variable } from "../statement";
+import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
+import Stmt, { Function, RecordField, RecordStmt, Variable } from "../statement";
 
 const tab = "  ";
 const newline = "\n";
@@ -16,10 +16,10 @@ export class TranslatorJS {
   /**
    * Used to keep track of the necessary imports.
    * - See `this.translateImports` for the translation to JS code.
-   * - See `this.import` for adding new imports. 
+   * - See `this.import` for adding new imports.
    */
   private imports: Record<string, Set<string>> = {};
-  private records: Array<RecordStmt> = [];
+  private recordsFields: Map<string, Array<RecordField>> = new Map();
 
   public translate (): string {
     // We cleanup the necessary imports.
@@ -139,7 +139,7 @@ export class TranslatorJS {
       return camelCase(statement.name.lexeme);
     }
     else if (statement instanceof RecordStmt) {
-      this.records.push(statement);
+      this.recordsFields.set(statement.name.lexeme, statement.fields);
 
       let output = "";
 
@@ -186,7 +186,7 @@ export class TranslatorJS {
     else if (statement instanceof Expr.Call) {
       const callee = this.visit(statement.callee);
       const args = statement.args.map((arg) => this.visit(arg)).join(", ");
-      
+
       let call = `${callee}(${args})`;
       if (statement.awaited) {
         call = `await ${call}`;
@@ -209,6 +209,31 @@ export class TranslatorJS {
       const name = statement.name.lexeme;
 
       return `${object}.${name}`;
+    }
+    else if (statement instanceof RecordInstanciationExpr) {
+      const fieldsInOrder = this.recordsFields.get(statement.name.lexeme);
+
+      if (!fieldsInOrder)
+        throw new Error(`record ${statement.name.lexeme} should be defined before`);
+
+      const className = pascalCase(statement.name.lexeme);
+      let output = `new ${className}(`;
+
+      for (const definedField of fieldsInOrder) {
+        const field = statement.fields.find(field => field.name.lexeme === definedField.name.lexeme);
+
+        if (!field) output += "void 0";
+        else output += this.visit(field.value);
+
+        output += ", ";
+      }
+
+      // we remove the extra `, ` at the end.
+      if (statement.fields.length > 0) {
+        output = output.slice(0, -2);
+      }
+
+      return output + ")";
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
