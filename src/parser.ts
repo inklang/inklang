@@ -28,7 +28,7 @@ export class Parser {
         do {
           const name = this.consume(TokenType.IDENTIFIER, "expect parameter name.")
           this.consume(TokenType.COLON, "expect colon for parameter type.")
-          const value = this.primary();
+          const value = this.expression();
           fields.push(new RecordFieldExpr(name, value));
         }
         while (this.match(TokenType.COMMA));
