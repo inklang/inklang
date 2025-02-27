@@ -11,10 +11,13 @@ async function main () {
 
   switch (command) {
     case "sync": {
+      // We don't catch the repository sync because it's crucial for the other syncs.
       await syncRepository();
-      await syncJavaScript();
-      await syncKotlin();
-      await syncRust();
+
+      await syncJavaScript().catch(error => console.error("was not able to sync javascript, due to", error));
+      await syncKotlin().catch(error => console.error("was not able to sync kotlin, due to", error));
+      await syncRust().catch(error => console.error("was not able to sync rust, due to", error));
+      
       break;
     }
     case "generate": {
