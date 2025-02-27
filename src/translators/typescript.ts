@@ -92,7 +92,7 @@ export class TranslatorTS {
         if (this.records.has(lexeme)) {
           type = pascalCase(lexeme);
         }
-        else throw new Error(`unknown generic variable type '${lexeme}'`);
+        else throw new Error(`unknown variable type '${lexeme}'`);
       }
     }
 

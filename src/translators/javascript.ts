@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import { camelCase, pascalCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
