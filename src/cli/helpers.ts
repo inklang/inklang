@@ -44,3 +44,13 @@ export async function execute (command: string, args: string[]): Promise<void> {
 export async function mkdir (path: string): Promise<void> {
   await fs.mkdir(path, { recursive: true }).catch(() => void 0);
 }
+
+export async function exists (path: string): Promise<boolean> {
+  try {
+    await fs.access(path);
+    return true;
+  }
+  catch {
+    return false;
+  }
+}

@@ -1,8 +1,9 @@
 import path from "node:path";
 
-import { syncKotlin, syncJavaScript, syncRepository } from "./cli/sync";
+import { syncKotlin, syncJavaScript, syncRepository, syncRust } from "./cli/sync";
 import { parse, TranslatorJS, TranslatorKotlin, TranslatorTS } from "./index";
 import { mkdir, readInkJSON, readTextFile, write } from "./cli/helpers";
+import { TranslatorRust } from "./translators/rust";
 
 async function main () {
   const args = process.argv.slice(2);
@@ -13,6 +14,7 @@ async function main () {
       await syncRepository();
       await syncJavaScript();
       await syncKotlin();
+      await syncRust();
       break;
     }
     case "generate": {
@@ -45,32 +47,21 @@ async function main () {
 
           const libDir = `generated/kotlin/src/main/${libSubPath}`;
           await mkdir(libDir);
-
           await write(`${libDir}/${inkJSON.displayName}.kt`, code);
-          await write("generated/kotlin/build.gradle.kts", `
-plugins {
-  alias(libs.plugins.kotlin.jvm)
-  \`java-library\`
-}
 
-repositories {
-  mavenCentral()
-}
+          break;
+        }
+        case "rust": {
+          header = header.replaceAll("{}", "//!");
+          const code = header + new TranslatorRust(statements).translate();
 
-dependencies {
+          await mkdir("generated/rust");
+          await write("generated/rust/lib.rs", code);
 
-}
-
-java {
-  toolchain {
-    languageVersion = JavaLanguageVersion.of(17)
-  }
-}
-          `.trim());
           break;
         }
         default: {
-          throw new Error(`unknown language: javascript, kotlin`);
+          throw new Error(`unknown language: javascript, kotlin, rust`);
         }
       }
 
