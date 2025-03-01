@@ -74,7 +74,18 @@ export class Parser {
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
       const field = this.consume(TokenType.IDENTIFIER, "expect field name.");
       this.consume(TokenType.COLON, "expect ':' after field name.");
-      const type = this.consume(TokenType.IDENTIFIER, "expect field type.");
+      let type: Token | AnnotationExpr;
+
+      // a: int
+      //    ^^^
+      if (!this.match(TokenType.AT)) {
+        type = this.consume(TokenType.IDENTIFIER, "expect field type.");
+      }
+      // a: @http::headers
+      //    ^^^^^^^^^^^^^^
+      else {
+        type = this.annotation(false) as AnnotationExpr;
+      }
 
       fields.push(new RecordField(field, type));
     }
