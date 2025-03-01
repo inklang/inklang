@@ -150,6 +150,9 @@ edition = "2021"
 path = "generated/rust/lib.rs"
 
 [dependencies]
+${ink.annotations.map((annotation) =>
+  `inklang_${annotation} = { git = "https://github.com/inklang/rust"}`
+).join("\n")}
   `.trim());
 
   await execute("cargo", ["update"]);
