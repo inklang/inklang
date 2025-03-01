@@ -52,56 +52,73 @@ export class TranslatorRust {
     return type;
   }
 
+  private typeIdentifierOrAnnotation (type: Token | AnnotationExpr): string {
+    this._isType = true;
+
+    const output = type instanceof Token
+      ? this.type(type.lexeme)
+      : this.visit(type)
+
+    delete this._isType;
+    return output;
+  }
+
   private _functionScope: Function | undefined;
+  private _isType: boolean | undefined;
+  private _indentDepth = 0;
+
+  private indent (): string {
+    return "\t".repeat(this._indentDepth);
+  }
 
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
-      let output = "";
       this._functionScope = statement;
-      if (statement.exposed) output = "pub ";
+      const head: string[] = [];
 
-      let returnType = statement.returnType instanceof Token
-        ? this.type(statement.returnType.lexeme)
-        : this.visit(statement.returnType);
+      if (statement.exposed)
+        head.push("pub");
 
-      if (statement.async) {
-        output += "async ";
-      }
+      if (statement.async)
+        head.push("async");
 
-      output += `fn ${snakeCase(statement.name.lexeme)} (`;
+      head.push("fn", snakeCase(statement.name.lexeme));
 
-      output += statement.params.map(
-        (param) => `${snakeCase(param.name.lexeme)}: ${
-          param.type instanceof Token
-            ? this.type(param.type.lexeme)
-            : this.visit(param.type)
-        }`
+      const args = statement.params.map(
+        (param) => `${snakeCase(param.name.lexeme)}: ${this.typeIdentifierOrAnnotation(param.type)}`
       ).join(", ");
 
-      output += `) -> ${returnType} {\n`;
+      const returnType = this.typeIdentifierOrAnnotation(statement.returnType);
+      const signature = head.join(" ") + `(${args}) -> ${returnType}`;
 
-      for (const stmt of statement.body) {
-        output += "\t" + this.visit(stmt) + "\n";
-      }
-
-      output += "}\n";
+      this._indentDepth++;
+      const body = statement.body.map(statement => (
+        this.indent() + this.visit(statement)
+      ));
 
       delete this._functionScope;
-      return output;
+      this._indentDepth--;
+
+      return signature + " {\n" + body.join("\n") + "\n" + "}";
     }
     else if (statement instanceof Variable) {
+      // We always `mut` the variable, just in case.
+      // Anyway, `clippy` will automatically fix it during the `generate` command.
       let output = `let mut ${snakeCase(statement.name.lexeme)}`;
+      output += `: ${this.typeIdentifierOrAnnotation(statement.type)}`;
 
-      if (statement.initializer) {
+      if (statement.initializer)
         output += ` = ${this.visit(statement.initializer)}`;
-      }
 
       return output + ";";
     }
     else if (statement instanceof Expr.Literal) {
       let output = JSON.stringify(statement.value);
+
+      // Literal strings are `&str` in Rust,
+      // we need to convert them to `String`.
       if (typeof statement.value === "string") {
-        output = `String::from(${output})`;
+        output = `${output}.to_string()`;
       }
 
       return output;
@@ -127,20 +144,22 @@ export class TranslatorRust {
     else if (statement instanceof RecordStmt) {
       this.records.add(statement.name.lexeme);
 
-      let output = "";
-      if (statement.exposed) output = "pub ";
+      const head: string[] = [];
 
-      const className = pascalCase(statement.name.lexeme);
-      output += `struct ${className} {\n`;
+      if (statement.exposed)
+        head.push("pub");
 
-      for (const field of statement.fields) {
-        const fieldName = snakeCase(field.name.lexeme);
-        output += `\tpub ${fieldName}: ${this.type(field.type.lexeme)},\n`;
-      }
+      head.push("struct", pascalCase(statement.name.lexeme));
 
-      output += "}\n";
+      this._indentDepth++;
 
-      return output;
+      const fields = statement.fields.map(
+        (field) => this.indent() + `pub ${snakeCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)},`
+      ).join("\n");
+
+      this._indentDepth--;
+
+      return head.join(" ") + " {\n" + fields + "\n}";
     }
     else if (statement instanceof Stmt.Expression) {
       return this.visit(statement.expression);
@@ -159,6 +178,12 @@ export class TranslatorRust {
 
       return call;
     }
+    else if (statement instanceof AnnotationExpr) {
+      const namespace = snakeCase(statement.namespace.lexeme);
+      const fnOrProperty = this._isType ? pascalCase(statement.property.lexeme) : snakeCase(statement.property.lexeme);
+
+      return `inklang_${namespace}::${fnOrProperty}`;
+    }
     else if (statement instanceof Expr.Get) {
       const object = this.visit(statement.object);
       const name = statement.name.lexeme;
@@ -166,7 +191,8 @@ export class TranslatorRust {
       return `${object}.${name}`;
     }
     else if (statement instanceof RecordInstanciationExpr) {
-      let output = `${pascalCase(statement.name.lexeme)} {`;
+      let output = pascalCase(statement.name.lexeme) + " {\n";
+      this._indentDepth++;
 
       const fieldsValue = statement.fields.map(field => this.visit(field.value));
       for (const field of statement.fields) {
@@ -198,15 +224,12 @@ export class TranslatorRust {
           value += ".clone()";
         }
 
-        output += `${snakeCase(field.name.lexeme)}: ${value}, `;
+        output += this.indent() + `${snakeCase(field.name.lexeme)}: ${value},\n`;
       }
 
-      // we remove the extra `, ` at the end.
-      if (statement.fields.length > 0) {
-        output = output.slice(0, -2);
-      }
+      this._indentDepth--;
+      output += this.indent() + "}";
 
-      output += "}";
       return output;
     }
 
