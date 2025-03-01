@@ -99,6 +99,12 @@ export class TranslatorTS {
     return type;
   }
 
+  private typeIdentifierOrAnnotation (type: Token | AnnotationExpr): string {
+    return type instanceof Token
+      ? this.type(type.lexeme)
+      : this.visit(type)
+  }
+
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
       if (!statement.exposed) return noop;
@@ -112,11 +118,11 @@ export class TranslatorTS {
       }
 
       let output = `export const ${camelCase(statement.name.lexeme)}: (`;
-      output += statement.params.map((param) => `${camelCase(param.name.lexeme)}: ${
-        param.type instanceof Token
-          ? this.type(param.type.lexeme)
-          : this.visit(param.type)
-      }`).join(", ");
+
+      output += statement.params.map((param) =>
+        `${camelCase(param.name.lexeme)}: ${this.typeIdentifierOrAnnotation(param.type)}`
+      ).join(", ");
+
       output += `) => ${returnType};` + newline;
 
       return output;
@@ -132,18 +138,19 @@ export class TranslatorTS {
       if (!statement.exposed) return noop;
 
       const className = pascalCase(statement.name.lexeme);
-      let output = `export class ${className} {` + newline;
+      let output = `export class ${className} {\n`;
 
       for (const field of statement.fields) {
-        output += tab + `public ${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)};` + newline;
+        output += tab + `public ${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)};\n`;
       }
 
       output += tab + "constructor (";
       for (let i = 0; i < statement.fields.length; i++) {
         const field = statement.fields[i];
-        output += `${camelCase(field.name.lexeme)}: ${this.type(field.type.lexeme)}${i !== statement.fields.length - 1 ? ", " : ""}`;
+        output += `${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)}`;
+        if (i !== statement.fields.length - 1) output += ", ";
       }
-      output += ");" + newline;
+      output += ");\n";
 
       output += '}';
       return output;
