@@ -12,6 +12,7 @@ export interface InkJSON {
    * List of annotations used in the code (eg.: `@http::headers` is from `http`).
    */
   annotations: string[];
+  examples: string[];
 }
 
 export async function readTextFile (path: string): Promise<string> {
