@@ -45,6 +45,9 @@ export class TranslatorKotlin {
       case "void":
         type = "Unit";
         break;
+      case "boolean":
+        type = "Boolean";
+        break;
       default:
         throw new Error(`unknown variable type '${lexeme}'`);
     }
@@ -125,10 +128,5 @@ export class TranslatorKotlin {
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
-  }
-
-  public async execute (): Promise<void> {
-    await fs.mkdir(`target/kotlin`, { recursive: true });
-    await fs.writeFile("target/kotlin/lib.kt", this.translate());
   }
 }
