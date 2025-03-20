@@ -4,7 +4,7 @@ import { syncKotlin, syncJavaScript, syncRepository, syncRust, syncSwift } from 
 import { parse, TranslatorJS, TranslatorKotlin, TranslatorTS } from "./index";
 import { execute, mkdir, readInkJSON, readTextFile, write } from "./cli/helpers";
 import { TranslatorRust } from "./translators/rust";
-import { kebabCase, pascalCase } from "change-case";
+import { kebabCase, pascalCase, snakeCase } from "change-case";
 
 async function main () {
   const args = process.argv.slice(2);
@@ -34,14 +34,17 @@ async function main () {
         await execute("tsx", ["examples/javascript/" + kebabCase(example) + ".mts"])
       }
       else if (language === "kotlin") {
-        throw new Error(`kotlin not implemented yet`);
+        await execute("./gradlew", [":examples:kotlin:run", `-PmainClass=${pascalCase(example)}Kt`])
       }
       else if (language === "swift") {
         await execute("swift", ["build"]);
         await execute("swift", ["run", pascalCase(example)]);
       }
+      else if (language === "rust") {
+        await execute("cargo", ["run", "--example", snakeCase(example)]);
+      }
       else {
-        throw new Error(`unknown language: javascript, kotlin, swift`);
+        throw new Error(`unknown language: javascript, kotlin, swift, rust`);
       }
 
       break;
@@ -68,15 +71,15 @@ async function main () {
           break;
         }
         case "kotlin": {
+          const ink = await readInkJSON();
           header = header.replaceAll("{}", "//");
-          const code = header + new TranslatorKotlin(statements).translate();
+          const code = header + `package ${ink.package}\n\n` +  new TranslatorKotlin(statements).translate();
 
-          const inkJSON = await readInkJSON();
-          const libSubPath = inkJSON.package.replace(/\./g, "/");
+          const libSubPath = ink.package.replace(/\./g, "/");
 
           const libDir = `generated/kotlin/src/main/${libSubPath}`;
           await mkdir(libDir);
-          await write(`${libDir}/${inkJSON.displayName}.kt`, code);
+          await write(`${libDir}/${ink.displayName}.kt`, code);
 
           break;
         }
@@ -96,9 +99,10 @@ async function main () {
         }
         case "swift": {
           const ink = await readInkJSON();
+          // TODO !!!!
           const code = `
-            func greet(name: String) -> String {
-                return "Hello, \(name)!"
+            public func greet() -> String {
+                return "Hello"
             }
           `;
           await mkdir("generated/swift");

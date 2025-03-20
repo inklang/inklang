@@ -1,4 +1,4 @@
-import { kebabCase, pascalCase } from "change-case";
+import { kebabCase, pascalCase, snakeCase } from "change-case";
 import { readInkJSON, write, execute, mkdir, exists } from "./helpers";
 
 export async function syncRepository (): Promise<void> {
@@ -7,9 +7,11 @@ export async function syncRepository (): Promise<void> {
 node_modules/
 
 # Kotlin
-.gradle/
+.gradle
+!gradle/wrapper/gradle-wrapper.jar
 target/
 build/
+.kotlin
 
 # Swift
 /.build
@@ -22,6 +24,22 @@ DerivedData/
 
 # Miscellaneous
 .DS_Store
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+*.iws
+*.iml
+*.ipr
+out/
+bin/
   `.trim());
 
   await write(".gitattributes", `
@@ -32,12 +50,17 @@ DerivedData/
 }
 
 export async function syncKotlin (): Promise<void> {
-  const inkJSON = await readInkJSON();
+  const ink = await readInkJSON();
 
   // Generate the build.gradle.kts file.
   await write("settings.gradle.kts", `
-rootProject.name = ${JSON.stringify(inkJSON.name)}
+plugins {
+  id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+}
+
+rootProject.name = ${JSON.stringify(ink.name)}
 val generatedKotlinDir = file("generated/kotlin")
+val examplesKotlinDir = file("examples/kotlin")
 
 if (generatedKotlinDir.exists()) {
   include("generated:kotlin")
@@ -45,13 +68,18 @@ if (generatedKotlinDir.exists()) {
 else {
   println("Skipping inclusion of 'generated:kotlin' as the directory does not exist.")
 }
+
+if (examplesKotlinDir.exists()) {
+  include("examples:kotlin")
+} else {
+  println("Skipping inclusion of 'examples:kotlin' as the directory does not exist.")
+}
   `.trim());
 
   await mkdir("generated/kotlin");
   await write("generated/kotlin/build.gradle.kts", `
 plugins {
-  alias(libs.plugins.kotlin.jvm)
-  \`java-library\`
+  kotlin("jvm") version "2.1.10"
 }
 
 repositories {
@@ -62,15 +90,18 @@ dependencies {
 
 }
 
-java {
-  toolchain {
-    languageVersion = JavaLanguageVersion.of(17)
+kotlin {
+  jvmToolchain(21)
+
+  sourceSets.main {
+    kotlin.srcDirs("src/main")
   }
 }
   `.trim());
 
   await write("gradle.properties", `
 org.gradle.configuration-cache=true
+kotlin.code.style=official
   `.trim());
 
   /**
@@ -82,16 +113,34 @@ org.gradle.configuration-cache=true
    */
   await execute("gradle", ["wrapper"]);
 
-  // Generate the libs.version.toml file for dependencies.
-  await write("gradle/libs.version.toml", `
-[versions]
-kotlin = "2.0.21"
+  await mkdir("examples/kotlin");
+  await write("examples/kotlin/build.gradle.kts", `
+plugins {
+  application
+  kotlin("jvm") version "2.1.10"
+}
 
-[libraries]
+repositories {
+  mavenCentral()
+}
 
-[plugins]
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+dependencies {
+  implementation(kotlin("stdlib"))
+  implementation(project(":generated:kotlin"))
+}
+
+application {
+  mainClass.set(findProperty("mainClass").toString())
+}
   `.trim());
+
+  for (const example of ink.examples) {
+    const path = `examples/kotlin/src/main/kotlin/${pascalCase(example)}.kt`;
+    const created = await exists(path);
+    if (!created) {
+      await write(path, `import ${ink.package}.*\n\nfun main() {\n  // This is an example file for the "${ink.name}" package.\n// TODO\n}\n`);
+    }
+  }
 }
 
 export async function syncJavaScript (): Promise<void> {
@@ -202,11 +251,13 @@ let package = Package(
   }
 }
 
-export async function syncRust (): Promise<void> {
+export async function syncRust(): Promise<void> {
   const ink = await readInkJSON();
 
-  if (!await exists("generated/rust/lib.rs")) {
-    await mkdir("generated/rust");
+  await mkdir("generated/rust");
+  const libraryExists = await exists("generated/rust/lib.rs");
+
+  if (!libraryExists) {
     await write("generated/rust/lib.rs", "// Empty file to avoid errors.");
   }
 
@@ -221,9 +272,30 @@ path = "generated/rust/lib.rs"
 
 [dependencies]
 ${ink.annotations.map((annotation) =>
-  `inklang_${annotation} = { git = "https://github.com/inklang/rust"}`
+  `inklang_${annotation} = { git = "https://github.com/inklang/rust" }`
+).join("\n")}
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+${ink.examples.map((example) =>
+  `
+[[example]]
+name = ${JSON.stringify(snakeCase(example))}
+path = "examples/rust/${snakeCase(example)}.rs"
+  `.trim()
 ).join("\n")}
   `.trim());
 
   await execute("cargo", ["update"]);
+
+  await mkdir("examples/rust");
+  for (const example of ink.examples) {
+    const path = `examples/rust/${snakeCase(example)}.rs`;
+
+    const exampleExists = await exists(path);
+    if (!exampleExists) {
+      await write(path, `/// This is an example file for the "${ink.name}" package.\n\n#[tokio::main]\nasync fn main() {\n  // TODO\n}\n`);
+    }
+  }
 }
