@@ -1,11 +1,27 @@
+import { kebabCase, pascalCase } from "change-case";
 import { readInkJSON, write, execute, mkdir, exists } from "./helpers";
 
 export async function syncRepository (): Promise<void> {
   await write(".gitignore", `
+# JS/TS
 node_modules/
+
+# Kotlin
 .gradle/
 target/
 build/
+
+# Swift
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Miscellaneous
+.DS_Store
   `.trim());
 
   await write(".gitattributes", `
@@ -130,6 +146,60 @@ export async function syncJavaScript (): Promise<void> {
   }, null, 2));
 
   await execute("pnpm", ["add", ...ink.annotations.map((annotation) => `@inklang/${annotation}@latest`)]);
+
+  await mkdir("examples/javascript");
+  for (const example of ink.examples) {
+    const path = `examples/javascript/${kebabCase(example)}.mts`;
+    const created = await exists(path);
+    if (!created) {
+      await write(path, `import * as ${ink.name} from "${ink.name}";\n\n// This is an example file for the "${ink.name}" package.\n// TODO !\n`);
+    }
+  }
+}
+
+export async function syncSwift(): Promise<void> {
+  const ink = await readInkJSON();
+
+  await write("Package.swift", `
+// swift-tools-version:6.0
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
+import PackageDescription
+
+let package = Package(
+    name: ${JSON.stringify(ink.displayName)},
+    products: [
+      .library(
+        name: ${JSON.stringify(ink.displayName)},
+        targets: [${JSON.stringify(ink.displayName)}]),
+    ],
+    targets: [
+      .target(
+          name: ${JSON.stringify(ink.displayName)},
+          dependencies: [],
+          path: "generated/swift"),
+      ${ink.examples.map((example) => `
+      .executableTarget(
+          name: ${JSON.stringify(pascalCase(example))},
+          dependencies: [${JSON.stringify(ink.displayName)}],
+          path: "examples/swift/${pascalCase(example)}"),
+      `.trim())}
+    ]
+)
+  `.trim());
+
+  await mkdir("examples/swift");
+  for (const example of ink.examples) {
+    const dir = `examples/swift/${pascalCase(example)}`;
+    await mkdir(dir);
+
+    const path = dir + "/main.swift";
+    const created = await exists(path);
+
+    if (!created) {
+      await write(path, `import ${ink.displayName}\n\n// TODO`);
+    }
+  }
 }
 
 export async function syncRust (): Promise<void> {

@@ -1,9 +1,10 @@
 import path from "node:path";
 
-import { syncKotlin, syncJavaScript, syncRepository, syncRust } from "./cli/sync";
+import { syncKotlin, syncJavaScript, syncRepository, syncRust, syncSwift } from "./cli/sync";
 import { parse, TranslatorJS, TranslatorKotlin, TranslatorTS } from "./index";
 import { execute, mkdir, readInkJSON, readTextFile, write } from "./cli/helpers";
 import { TranslatorRust } from "./translators/rust";
+import { kebabCase, pascalCase } from "change-case";
 
 async function main () {
   const args = process.argv.slice(2);
@@ -17,6 +18,31 @@ async function main () {
       await syncJavaScript().catch(error => console.error("was not able to sync javascript, due to", error));
       await syncKotlin().catch(error => console.error("was not able to sync kotlin, due to", error));
       await syncRust().catch(error => console.error("was not able to sync rust, due to", error));
+      await syncSwift().catch(error => console.error("was not able to sync swift, due to", error));
+      break;
+    }
+    case "run": {
+      const ink = await readInkJSON();
+      const language = args.shift();
+      const example = args.shift();
+
+      if (!example || !ink.examples.includes(example)) {
+        throw new Error(`unknown example: ${example}`);
+      }
+
+      if (language === "javascript") {
+        await execute("tsx", ["examples/javascript/" + kebabCase(example) + ".mts"])
+      }
+      else if (language === "kotlin") {
+        throw new Error(`kotlin not implemented yet`);
+      }
+      else if (language === "swift") {
+        await execute("swift", ["build"]);
+        await execute("swift", ["run", pascalCase(example)]);
+      }
+      else {
+        throw new Error(`unknown language: javascript, kotlin, swift`);
+      }
 
       break;
     }
@@ -66,6 +92,17 @@ async function main () {
           // Automatically format the code.
           await execute("cargo", ["fmt"]);
 
+          break;
+        }
+        case "swift": {
+          const ink = await readInkJSON();
+          const code = `
+            func greet(name: String) -> String {
+                return "Hello, \(name)!"
+            }
+          `;
+          await mkdir("generated/swift");
+          await write(`generated/swift/${ink.displayName}.swift`, code);
           break;
         }
         default: {
