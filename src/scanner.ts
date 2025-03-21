@@ -18,7 +18,7 @@ export class Scanner {
     ["public", TokenType.PUBLIC],
     ["private", TokenType.PRIVATE],
     ["expose", TokenType.EXPOSE],
-    
+
     ["async", TokenType.ASYNC],
     ["await", TokenType.AWAIT],
 
@@ -27,6 +27,9 @@ export class Scanner {
     ["and", TokenType.AND],
     ["or", TokenType.OR],
 
+    ["in", TokenType.IN],
+    ["from", TokenType.FROM],
+    ["to", TokenType.TO],
     ["for", TokenType.FOR],
     ["while", TokenType.WHILE],
 

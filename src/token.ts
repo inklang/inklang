@@ -47,6 +47,9 @@ export enum TokenType {
   ASYNC,
   AWAIT,
   NULL,
+  IN,
+  FROM,
+  TO,
 
   EOF
 }

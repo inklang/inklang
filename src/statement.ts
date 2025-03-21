@@ -78,3 +78,11 @@ export class While extends Stmt {
     public readonly body: Stmt,
   ) { super() }
 }
+
+export class For extends Stmt {
+  public constructor (
+    public readonly identifier: Token,
+    public readonly iterable: Expr,
+    public readonly body: Array<Stmt>,
+  ) { super() }
+}

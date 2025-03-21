@@ -1,5 +1,5 @@
 import Expr, { AnnotationExpr, RecordFieldExpr, RecordInstanciationExpr } from "./expression";
-import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While } from "./statement";
+import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While, For } from "./statement";
 import { Token, TokenType } from "./token";
 
 export class Parser {
@@ -18,27 +18,42 @@ export class Parser {
   }
 
   private expression (): Expr {
-    // TODO: move into a proper function
-    if (this.check(TokenType.IDENTIFIER) && this.tokens[this.current + 1].type === TokenType.LBRACE) {
-      const name = this.consume(TokenType.IDENTIFIER, "expected identifier for record instanciation.");
-      this.consume(TokenType.LBRACE, "expected '{' for record instanciation.");
-      const fields: Array<RecordFieldExpr> = [];
+    if ( // we're doing a record instanciation
+      this.check(TokenType.IDENTIFIER)
+      && this.tokens[this.current + 1].type === TokenType.LBRACE
 
-      if (!this.check(TokenType.RBRACE)) {
-        do {
-          const name = this.consume(TokenType.IDENTIFIER, "expect parameter name.")
-          this.consume(TokenType.COLON, "expect colon for parameter type.")
-          const value = this.expression();
-          fields.push(new RecordFieldExpr(name, value));
-        }
-        while (this.match(TokenType.COMMA));
-      }
+      // Prevent false detection in the case where...
+      // `for x in array {`
+      //        !! ^^^^^ ^
+      && this.tokens[this.current - 1].type !== TokenType.IN
 
-      this.consume(TokenType.RBRACE, "expected '}' after record instanciation.");
-      return new RecordInstanciationExpr(name, fields);
-    }
+      // Prevent false detection in the case where...
+      // `for i from start to end {`
+      //                   !! ^^^ ^
+      // Prevent falling in the case where `for i from start to end {`
+      && this.tokens[this.current - 1].type !== TokenType.TO
+    ) return this.recordInstantiation();
 
     return this.assignment();
+  }
+
+  private recordInstantiation (): Expr {
+    const name = this.consume(TokenType.IDENTIFIER, "expected identifier for record instanciation.");
+    this.consume(TokenType.LBRACE, "expected '{' for record instanciation.");
+    const fields: Array<RecordFieldExpr> = [];
+
+    if (!this.check(TokenType.RBRACE)) {
+      do {
+        const name = this.consume(TokenType.IDENTIFIER, "expect parameter name.")
+        this.consume(TokenType.COLON, "expect colon for parameter type.")
+        const value = this.expression();
+        fields.push(new RecordFieldExpr(name, value));
+      }
+      while (this.match(TokenType.COMMA));
+    }
+
+    this.consume(TokenType.RBRACE, "expected '}' after record instanciation.");
+    return new RecordInstanciationExpr(name, fields);
   }
 
   private declaration (): Stmt {
@@ -116,8 +131,34 @@ export class Parser {
     return this.expressionStatement();
   }
 
+  /**
+   * <pre>
+   * for <identifier> in <expression> {}
+   * for <identifier> from <expression> to <expression> {}
+   * </pre>
+   */
   private forStatement (): Stmt {
-    throw this.error(this.previous(), "for statement not implemented yet.");
+    // for <identifier> in <expression> {}
+    // ^^^
+    // (consumed TokenType.FOR)
+
+    // for <identifier> in <expression> {}
+    //    ^^^^^^^^^^^^^
+    const identifier = this.consume(TokenType.IDENTIFIER, "expect variable name.");
+
+    // for <identifier> in <expression> {}
+    //                  ^^
+    this.consume(TokenType.IN, "expect 'in' after variable name.");
+
+    // for <identifier> in <expression> {}
+    //                     ^^^^^^^^^^^^
+    const expression = this.expression();
+
+    // for <identifier> in <expression> {}
+    //                                  ^
+    this.consume(TokenType.LBRACE, "expect '{' after 'for'.");
+
+    return new For(identifier, expression, this.block());
   }
 
   private ifStatement (): Stmt {
@@ -180,10 +221,6 @@ export class Parser {
     const value = this.expression();
     this.consume(TokenType.SEMICOLON, "expect ';' after expression.");
     return new Stmt.Expression(value);
-  }
-
-  private recordInstantiation (): Stmt {
-    throw this.error(this.peek(), "record instantiation not implemented yet.");
   }
 
   private functionDeclaration (exposed: boolean, async: boolean): Function {
