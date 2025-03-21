@@ -53,14 +53,11 @@ export class TranslatorRust {
   }
 
   private typeIdentifierOrAnnotation (type: Token | AnnotationExpr): string {
-    const output = type instanceof Token
+    return type instanceof Token
       ? this.type(type.lexeme)
       : this.visitAnnotationExpr(type, true);
-
-    return output;
   }
 
-  // private _isType: boolean | undefined;
   private _indentDepth = 0;
 
   private indent (): string {
@@ -101,7 +98,7 @@ export class TranslatorRust {
 
       this._indentDepth--;
 
-      return signature + " {\n" + body.join("\n") + "\n" + "}";
+      return signature + " {\n" + body.join("\n") + "\n}";
     }
     else if (statement instanceof Variable) {
       // We always `mut` the variable, just in case.
