@@ -113,7 +113,7 @@ kotlin.code.style=official
    */
   await execute("gradle", ["wrapper"]);
 
-  await mkdir("examples/kotlin");
+  await mkdir("examples/kotlin/src/main/kotlin");
   await write("examples/kotlin/build.gradle.kts", `
 plugins {
   application
