@@ -5,9 +5,7 @@ import Stmt, { Function, RecordStmt, Variable } from "../statement";
 import { pascalCase } from "change-case";
 import { Token } from "../token";
 
-const tab = "  ";
 const noop = "";
-const newline = "\n";
 
 export class TranslatorTS {
   public constructor (
@@ -33,7 +31,7 @@ export class TranslatorTS {
 
     // We then join the imports and statements with a newline.
     // We introduce a separator between the imports and the statements for better readability.
-    return [...this.translateImports(), "", ...statements].join(newline);
+    return [...this.translateImports(), "", ...statements].join("\n");
   }
 
   private import (namespace: string, fnOrProperty: string): void {
@@ -102,30 +100,30 @@ export class TranslatorTS {
   private typeIdentifierOrAnnotation (type: Token | AnnotationExpr): string {
     return type instanceof Token
       ? this.type(type.lexeme)
-      : this.visit(type)
+      : this.visitAnnotationExpr(type)
+  }
+
+  private _indentDepth = 0;
+
+  private indent (): string {
+    return "\t".repeat(this._indentDepth);
   }
 
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
       if (!statement.exposed) return noop;
 
-      let returnType = statement.returnType instanceof Token
-        ? this.type(statement.returnType.lexeme)
-        : this.visit(statement.returnType);
+      const head: string[] = [];
+      head.push("export", "const", camelCase(statement.name.lexeme));
 
-      if (statement.async) {
-        returnType = `Promise<${returnType}>`;
-      }
-
-      let output = `export const ${camelCase(statement.name.lexeme)}: (`;
-
-      output += statement.params.map((param) =>
+      const args = statement.params.map((param) =>
         `${camelCase(param.name.lexeme)}: ${this.typeIdentifierOrAnnotation(param.type)}`
       ).join(", ");
 
-      output += `) => ${returnType};` + newline;
+      const returnType = this.typeIdentifierOrAnnotation(statement.returnType);
+      const signature = head.join(" ") + `: (${args}) => ${statement.async ? `Promise<${returnType}>` : returnType}`;
 
-      return output;
+      return signature + "\n";
     }
     else if (statement instanceof Variable) {
       return noop;
@@ -135,25 +133,27 @@ export class TranslatorTS {
     }
     else if (statement instanceof RecordStmt) {
       this.records.add(statement.name.lexeme);
-      if (!statement.exposed) return noop;
 
-      const className = pascalCase(statement.name.lexeme);
-      let output = `export class ${className} {\n`;
+      const head: string[] = [];
 
-      for (const field of statement.fields) {
-        output += tab + `public ${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)};\n`;
-      }
+      if (statement.exposed)
+        head.push("export");
 
-      output += tab + "constructor (";
-      for (let i = 0; i < statement.fields.length; i++) {
-        const field = statement.fields[i];
-        output += `${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)}`;
-        if (i !== statement.fields.length - 1) output += ", ";
-      }
-      output += ");\n";
+      head.push("class", pascalCase(statement.name.lexeme));
 
-      output += '}';
-      return output;
+      this._indentDepth++;
+
+      const fields = statement.fields.map(
+        (field) => this.indent() + `public ${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)};`
+      ).join("\n");
+
+      const constructor = this.indent() + "constructor (" + statement.fields.map(
+        (field) => `${camelCase(field.name.lexeme)}: ${this.typeIdentifierOrAnnotation(field.type)}`
+      ).join(", ") + ");";
+
+      this._indentDepth--;
+
+      return head.join(" ") + " {\n" + fields + "\n" + constructor + "\n" + "}";
     }
     else if (statement instanceof Stmt.Expression) {
       return this.visit(statement.expression);
@@ -162,16 +162,23 @@ export class TranslatorTS {
       return noop;
     }
     else if (statement instanceof AnnotationExpr) {
-      const namespace = camelCase(statement.namespace.lexeme);
-      const fnOrProperty = pascalCase(statement.property.lexeme);
-
-      // Add it to the imports property so we make sure to import it in the code at the end.
-      this.import(namespace, fnOrProperty);
-
-      // We use a prefixed name to avoid conflicts with other variables.
-      return this.annotation(namespace, fnOrProperty)
+      return this.visitAnnotationExpr(statement);
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
+  }
+
+  private visitAnnotationExpr (statement: AnnotationExpr): string {
+    const namespace = camelCase(statement.namespace.lexeme);
+    const fnOrProperty = pascalCase(statement.property.lexeme);
+
+    // Add it to the imports property so we make sure to import it in the code at the end.
+    this.import(namespace, fnOrProperty);
+
+    // We use a prefixed name to avoid conflicts with other variables.
+    const expr = this.annotation(namespace, fnOrProperty);
+
+    if (!statement.generic) return expr;
+    return `${expr}<${this.typeIdentifierOrAnnotation(statement.generic)}>`;
   }
 }

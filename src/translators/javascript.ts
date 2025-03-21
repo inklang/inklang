@@ -1,10 +1,7 @@
 import { camelCase, pascalCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
-import Stmt, { Function, RecordField, RecordStmt, Variable } from "../statement";
-
-const tab = "  ";
-const newline = "\n";
+import Stmt, { For, Function, RecordField, RecordStmt, Variable } from "../statement";
 
 export class TranslatorJS {
   public constructor (
@@ -31,7 +28,7 @@ export class TranslatorJS {
 
     // We then join the imports and statements with a newline.
     // We introduce a separator between the imports and the statements for better readability.
-    return [...this.translateImports(), "", ...statements].join(newline);
+    return [...this.translateImports(), "", ...statements].join("\n");
   }
 
   private import (namespace: string, fnOrProperty: string): void {
@@ -78,31 +75,50 @@ export class TranslatorJS {
     return "inklang__" + namespace + "_" + fnOrProperty;
   }
 
+  private _indentDepth = 0;
+
+  private indent (): string {
+    return "\t".repeat(this._indentDepth);
+  }
+
+  private appendSemiColon (output: string): string {
+    if (output.trim().endsWith("}"))  {
+      return output;
+    }
+
+    return output + ";";
+  }
+
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
-      let output = "";
+      const head: string[] = [];
 
-      if (statement.exposed && this.type === "mjs") {
-        output += "export ";
-      }
+      if (statement.exposed && this.type === "mjs")
+        head.push("export");
 
-      const functionName = camelCase(statement.name.lexeme)
-      output += `const ${functionName} = ${statement.async ? "async" : ""} (`;
-      for (let i = 0; i < statement.params.length; i++) {
-        const param = statement.params[i];
-        output += `${camelCase(param.name.lexeme)}${i !== statement.params.length - 1 ? ", " : ""}`;
-      }
+      const name = camelCase(statement.name.lexeme)
+      head.push("const", name, "=");
 
-      output += ') => {' + newline;
+      if (statement.async)
+        head.push("async");
 
-      for (const stmt of statement.body) {
-        output += tab + this.visit(stmt) + newline;
-      }
+      const args = statement.params.map(
+        (param) => camelCase(param.name.lexeme)
+      ).join(", ");
 
-      output += '};';
+      const signature = head.join(" ") + ` (${args}) =>`;
+
+      this._indentDepth++;
+      const body = statement.body.map(statement => this.appendSemiColon(
+        this.indent() + this.visit(statement)
+      ));
+
+      this._indentDepth--;
+
+      const output = signature + " {\n" + body.join("\n") + "\n}";
 
       if (statement.exposed && this.type === "cjs") {
-        output += newline + `exports.${functionName} = ${functionName};`;
+        return output + this.appendSemiColon(`\nexports.${name} = ${name}`);
       }
 
       return output;
@@ -114,17 +130,17 @@ export class TranslatorJS {
         output += ` = ${this.visit(statement.initializer)}`;
       }
 
-      return output + ";";
+      return output;
     }
     else if (statement instanceof Expr.Literal) {
       return JSON.stringify(statement.value);
     }
     else if (statement instanceof Stmt.Return) {
       if (statement.value === null) {
-        return "return;";
+        return "return";
       }
       else {
-        return `return ${this.visit(statement.value)};`;
+        return `return ${this.visit(statement.value)}`;
       }
     }
     else if (statement instanceof Expr.Binary) {
@@ -140,38 +156,42 @@ export class TranslatorJS {
     else if (statement instanceof RecordStmt) {
       this.recordsFields.set(statement.name.lexeme, statement.fields);
 
-      let output = "";
+      const head: string[] = [];
 
-      if (statement.exposed && this.type === "mjs") {
-        output += "export ";
-      }
+      if (statement.exposed)
+        head.push("export");
 
-      const className = pascalCase(statement.name.lexeme);
-      output += `class ${className} {` + newline;
+      const name = pascalCase(statement.name.lexeme);
+      head.push("class", name);
 
-      for (const field of statement.fields) {
-        const fieldName = camelCase(field.name.lexeme);
-        output += tab + fieldName + ";" + newline;
-      }
+      this._indentDepth++;
 
-      output += tab + "constructor (";
-      for (let i = 0; i < statement.fields.length; i++) {
-        const field = statement.fields[i];
-        const fieldName = camelCase(field.name.lexeme);
-        output += `${fieldName}${i !== statement.fields.length - 1 ? ", " : ""}`;
-      }
-      output += ") {" + newline;
+      const fields = statement.fields.map(
+        (field) => this.indent() + `${camelCase(field.name.lexeme)};`
+      ).join("\n");
 
-      for (const field of statement.fields) {
-        const fieldName = camelCase(field.name.lexeme);
-        output += tab.repeat(2) + `this.${fieldName} = ${fieldName};` + newline;
-      }
+      const constructor = this.indent() + "constructor (" + statement.fields.map(
+        (field) => `${camelCase(field.name.lexeme)}`
+      ).join(", ") + ")";
 
-      output += tab + '}' + newline;
-      output += '}' + newline;
+      this._indentDepth++;
+
+      const constructorBody = statement.fields.map(
+        (field) => {
+          const name = camelCase(field.name.lexeme);
+          return this.indent() + `this.${name} = ${name};`;
+        }
+      ).join("\n");
+
+      this._indentDepth--;
+
+      const body = fields + "\n" + constructor + " {\n" + constructorBody + "\n" + this.indent() + "}";
+
+      this._indentDepth--;
+      const output = head.join(" ") + " {\n" + body + "\n" + "}";
 
       if (statement.exposed && this.type === "cjs") {
-        output += newline + `exports.${className} = ${className};`;
+        return output + this.appendSemiColon(`\nexports.${name} = ${name}`);
       }
 
       return output;
@@ -180,7 +200,7 @@ export class TranslatorJS {
       return this.visit(statement.expression);
     }
     else if (statement instanceof Expr.Assign) {
-      return `${camelCase(statement.name.lexeme)} = ${this.visit(statement.value)};`;
+      return `${camelCase(statement.name.lexeme)} = ${this.visit(statement.value)}`;
     }
     else if (statement instanceof Expr.Call) {
       const callee = this.visit(statement.callee);
@@ -233,6 +253,18 @@ export class TranslatorJS {
       }
 
       return output + ")";
+    }
+    else if (statement instanceof For) {
+      const head = `for (let ${camelCase(statement.identifier.lexeme)} of ${this.visit(statement.iterable)}) {`;
+
+      this._indentDepth++;
+      const body = statement.body.map(statement => this.appendSemiColon(
+        this.indent() + this.visit(statement)
+      ));
+
+      this._indentDepth--;
+
+      return head + "\n" + body.join("\n") + "\n" + this.indent() + "}";
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
