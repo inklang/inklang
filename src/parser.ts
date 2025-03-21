@@ -74,18 +74,12 @@ export class Parser {
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
       const field = this.consume(TokenType.IDENTIFIER, "expect field name.");
       this.consume(TokenType.COLON, "expect ':' after field name.");
-      let type: Token | AnnotationExpr;
 
       // a: int
       //    ^^^
-      if (!this.match(TokenType.AT)) {
-        type = this.consume(TokenType.IDENTIFIER, "expect field type.");
-      }
       // a: @http::headers
       //    ^^^^^^^^^^^^^^
-      else {
-        type = this.annotation(false) as AnnotationExpr;
-      }
+      const type = this.type();
 
       fields.push(new RecordField(field, type));
     }
@@ -158,18 +152,11 @@ export class Parser {
     const name = this.consume(TokenType.IDENTIFIER, "expect variable name.");
     this.consume(TokenType.COLON, "expect ':' after variable name.");
 
-    let type: Token | AnnotationExpr;
-
     // var a: int;
     //        ^^^
-    if (!this.match(TokenType.AT)) {
-      type = this.consume(TokenType.IDENTIFIER, "expect variable type.");
-    }
     // var a: @http::headers;
     //        ^^^^^^^^^^^^^^
-    else {
-      type = this.annotation(false) as AnnotationExpr;
-    }
+    const type = this.type();
 
     let initializer: Expr | null = null;
     if (this.match(TokenType.EQUAL)) {
@@ -219,18 +206,11 @@ export class Parser {
         //                      ^
         this.consume(TokenType.COLON, "expect colon for parameter type.")
 
-        let type: Token | AnnotationExpr;
-
         // function something (a: int, b: int) -> type {}
         //                        ^^^
-        if (!this.match(TokenType.AT)) {
-          type = this.consume(TokenType.IDENTIFIER, "expect parameter type.");
-        }
         // function something (a: @http::headers, b: int) -> type {}
         //                        ^^^^^^^^^^^^^^
-        else {
-          type = this.annotation(false) as AnnotationExpr;
-        }
+        const type = this.type();
 
         parameters.push(new FunctionParameter(name, type));
       }
@@ -248,18 +228,7 @@ export class Parser {
     //                                     ^^
     this.consume(TokenType.RARROW, "expect '->' to define function return type.");
 
-    let returnType: Token | AnnotationExpr;
-
-    // function something (a: int, b: int) -> type {}
-    //                                        ^^^^
-    if (!this.match(TokenType.AT)) {
-      returnType = this.consume(TokenType.IDENTIFIER, "expect return type.");
-    }
-    // function something (a: int, b: int) -> @http::headers {}
-    //                                        ^^^^^^^^^^^^^^
-    else {
-      returnType = this.annotation(false) as AnnotationExpr;
-    }
+    const returnType = this.type();
 
     // function something (a: int, b: int) -> type {}
     //                                             ^
@@ -409,12 +378,14 @@ export class Parser {
 		return new Expr.Call(callee, paren, args, annotation, awaited);
 	}
 
+  // A full function call.
   private call (annotation: boolean): Expr {
     // await fn_call()
     // ^^^^^ (optional)
     const awaited = this.match(TokenType.AWAIT);
 
     // fn_call()
+    // ^^^^^^^
 		let expression = this.primary();
 
 		while (true) {
@@ -424,18 +395,41 @@ export class Parser {
 			if (this.match(TokenType.LPAREN)) {
 				expression = this.finishCall(expression, annotation, awaited);
 			}
+      // Will iterate through all the getters.
       // my.struct.for.fn_call()
       //   ^      ^   ^ (getters)
-      // Will iterate through all the getters.
       else if (this.match(TokenType.DOT)) {
-        const name = this.consume(TokenType.IDENTIFIER, "expect property name after '.'.");
+        const name = this.consume(TokenType.IDENTIFIER, "expected a property name after '.'");
         expression = new Expr.Get(expression, name);
       }
+
       else break;
 		}
 
 		return expression;
 	}
+
+  /**
+   * When typing a function return or a variable,
+   * it could be either a type or a record type.
+   *
+   * <pre>
+   * var a: int = 1;
+   *        ^^^
+   * var b: @http::headers = @http::create_headers();
+   *        ^^^^^^^^^^^^^^
+   * function something(a: int, b: @http::headers) -> @http::headers {}
+   *                       ^^^     ^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^
+   * </pre>
+   */
+  private type (): Token | AnnotationExpr {
+    if (!this.match(TokenType.AT)) {
+      return this.consume(TokenType.IDENTIFIER, "expected a type or record type");
+    }
+    else {
+      return this.annotation(false) as AnnotationExpr;
+    }
+  }
 
   /**
    * An annotation is a special type of call or identifier that is used to
@@ -448,13 +442,43 @@ export class Parser {
    * ```
    */
   private annotation (allowFnCallMatch: boolean): Expr | AnnotationExpr {
+    // @http::headers
+    // ^
     // (consumed TokenType.AT)
 
+    // @http::headers
+    //  ^^^^
     const namespace = this.consume(TokenType.IDENTIFIER, "expect namespace after '@'.");
+
+    // @http::headers
+    //      ^
     this.consume(TokenType.COLON, "expect a double ':' after namespace.");
+
+    // @http::headers
+    //       ^
     this.consume(TokenType.COLON, "expect a double ':' after namespace.");
+
+    // @http::headers
+    //        ^^^^^^^
     const property = this.consume(TokenType.IDENTIFIER, "expect property after namespace.");
 
+    // We check if a generic value is present.
+    // @array::of<type>
+    //           ^
+    if (this.match(TokenType.LESS)) {
+      // @array::of<type>
+      //            ^^^^
+      const generic = this.type();
+
+      // @array::of<type>
+      //                ^
+      this.consume(TokenType.GREATER, "expect '>' after type.");
+      return new AnnotationExpr(namespace, property, generic);
+    }
+
+    // We check if a function call is present.
+    // @http::send(request)
+    //            ^
     if (this.match(TokenType.LPAREN)) {
       if (allowFnCallMatch) {
         // (AWAIT), AT, IDENTIFIER, COLON, COLON, IDENTIFIER, LPAREN : 7 tokens before.

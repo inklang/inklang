@@ -79,6 +79,7 @@ export class AnnotationExpr extends Expr {
   public constructor (
     public readonly namespace: Token,
     public readonly property: Token,
+    public readonly generic?: Token | AnnotationExpr,
   ) { super() }
 }
 
