@@ -287,7 +287,7 @@ path = "examples/rust/${snakeCase(example)}.rs"
 ).join("\n")}
   `.trim());
 
-  await execute("cargo", ["update"]);
+  await execute("cargo", ["check"]);
 
   await mkdir("examples/rust");
   for (const example of ink.examples) {
