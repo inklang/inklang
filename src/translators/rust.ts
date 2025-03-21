@@ -1,7 +1,7 @@
 import { camelCase, pascalCase, snakeCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
-import Stmt, { Function, RecordField, RecordStmt, Variable } from "../statement";
+import Stmt, { For, Function, RecordField, RecordStmt, Variable } from "../statement";
 import { Token } from "../token";
 
 export class TranslatorRust {
@@ -60,7 +60,6 @@ export class TranslatorRust {
     return output;
   }
 
-  private _functionScope: Function | undefined;
   // private _isType: boolean | undefined;
   private _indentDepth = 0;
 
@@ -68,9 +67,16 @@ export class TranslatorRust {
     return "\t".repeat(this._indentDepth);
   }
 
+  private appendSemiColon (output: string): string {
+    if (output.trim().endsWith("}"))  {
+      return output;
+    }
+
+    return output + ";";
+  }
+
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
-      this._functionScope = statement;
       const head: string[] = [];
 
       if (statement.exposed)
@@ -89,11 +95,10 @@ export class TranslatorRust {
       const signature = head.join(" ") + `(${args}) -> ${returnType}`;
 
       this._indentDepth++;
-      const body = statement.body.map(statement => (
+      const body = statement.body.map(statement => this.appendSemiColon(
         this.indent() + this.visit(statement)
       ));
 
-      delete this._functionScope;
       this._indentDepth--;
 
       return signature + " {\n" + body.join("\n") + "\n" + "}";
@@ -107,7 +112,7 @@ export class TranslatorRust {
       if (statement.initializer)
         output += ` = ${this.visit(statement.initializer)}`;
 
-      return output + ";";
+      return output;
     }
     else if (statement instanceof Expr.Literal) {
       let output = JSON.stringify(statement.value);
@@ -122,10 +127,10 @@ export class TranslatorRust {
     }
     else if (statement instanceof Stmt.Return) {
       if (statement.value === null) {
-        return "return;";
+        return "return";
       }
       else {
-        return `return ${this.visit(statement.value)};`;
+        return `return ${this.visit(statement.value)}`;
       }
     }
     else if (statement instanceof Expr.Binary) {
@@ -163,7 +168,7 @@ export class TranslatorRust {
       return this.visit(statement.expression);
     }
     else if (statement instanceof Expr.Assign) {
-      return `let mut ${snakeCase(statement.name.lexeme)} = ${this.visit(statement.value)};`;
+      return `${snakeCase(statement.name.lexeme)} = ${this.visit(statement.value)}`;
     }
     else if (statement instanceof Expr.Call) {
       const callee = this.visit(statement.callee);
@@ -227,6 +232,18 @@ export class TranslatorRust {
 
       return output;
     }
+    else if (statement instanceof For) {
+      const head = `for mut ${snakeCase(statement.identifier.lexeme)} in ${this.visit(statement.iterable)} {`;
+
+      this._indentDepth++;
+      const body = statement.body.map(statement => this.appendSemiColon(
+        this.indent() + this.visit(statement)
+      ));
+
+      this._indentDepth--;
+
+      return head + "\n" + body.join("\n") + "\n" + this.indent() + "}";
+    }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
   }
@@ -235,8 +252,16 @@ export class TranslatorRust {
     const namespace = snakeCase(statement.namespace.lexeme);
     const fnOrProperty = isType ? pascalCase(statement.property.lexeme) : snakeCase(statement.property.lexeme);
 
-    const call = `inklang_${namespace}::${fnOrProperty}`;
-    if (!statement.generic) return call;
-    return `${call}::<${this.typeIdentifierOrAnnotation(statement.generic)}>`;
+    let expr = `inklang_${namespace}::${fnOrProperty}`;
+
+    // NOTE: Here we're patching the generated code depending
+    //       on the namespace and the property because some
+    //       of them needs to be handled differently.
+    if (namespace === "json" && fnOrProperty === "get_property") {
+      expr += "!"; // Make it a macro call !
+    }
+
+    if (!statement.generic) return expr;
+    return `${expr}::<${this.typeIdentifierOrAnnotation(statement.generic)}>`;
   }
 }
