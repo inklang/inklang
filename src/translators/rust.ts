@@ -53,18 +53,15 @@ export class TranslatorRust {
   }
 
   private typeIdentifierOrAnnotation (type: Token | AnnotationExpr): string {
-    this._isType = true;
-
     const output = type instanceof Token
       ? this.type(type.lexeme)
-      : this.visit(type)
+      : this.visitAnnotationExpr(type, true);
 
-    delete this._isType;
     return output;
   }
 
   private _functionScope: Function | undefined;
-  private _isType: boolean | undefined;
+  // private _isType: boolean | undefined;
   private _indentDepth = 0;
 
   private indent (): string {
@@ -144,6 +141,7 @@ export class TranslatorRust {
     else if (statement instanceof RecordStmt) {
       this.records.add(statement.name.lexeme);
 
+      const derives = ["Debug", "Clone"];
       const head: string[] = [];
 
       if (statement.exposed)
@@ -159,7 +157,7 @@ export class TranslatorRust {
 
       this._indentDepth--;
 
-      return head.join(" ") + " {\n" + fields + "\n}";
+      return "#[derive(" + derives.join(", ") + ")]\n" + head.join(" ") + " {\n" + fields + "\n}";
     }
     else if (statement instanceof Stmt.Expression) {
       return this.visit(statement.expression);
@@ -179,10 +177,7 @@ export class TranslatorRust {
       return call;
     }
     else if (statement instanceof AnnotationExpr) {
-      const namespace = snakeCase(statement.namespace.lexeme);
-      const fnOrProperty = this._isType ? pascalCase(statement.property.lexeme) : snakeCase(statement.property.lexeme);
-
-      return `inklang_${namespace}::${fnOrProperty}`;
+      return this.visitAnnotationExpr(statement, false);
     }
     else if (statement instanceof Expr.Get) {
       const object = this.visit(statement.object);
@@ -234,5 +229,14 @@ export class TranslatorRust {
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
+  }
+
+  private visitAnnotationExpr (statement: AnnotationExpr, isType: boolean): string {
+    const namespace = snakeCase(statement.namespace.lexeme);
+    const fnOrProperty = isType ? pascalCase(statement.property.lexeme) : snakeCase(statement.property.lexeme);
+
+    const call = `inklang_${namespace}::${fnOrProperty}`;
+    if (!statement.generic) return call;
+    return `${call}::<${this.typeIdentifierOrAnnotation(statement.generic)}>`;
   }
 }
