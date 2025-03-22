@@ -18,8 +18,8 @@ export default abstract class Stmt {
   public static readonly If = class If extends Stmt {
     public constructor (
       public readonly condition: Expr,
-      public readonly thenBranch: Stmt,
-      public readonly elseBranch: Stmt | null,
+      public readonly thenBranch: Array<Stmt>,
+      public readonly elseBranch: Array<Stmt> | null,
     ) { super() }
   }
 

@@ -174,10 +174,13 @@ export class Parser {
     const condition = this.expression();
     this.consume(TokenType.RPAREN, "expect ')' after condition.");
 
-    const thenBranch = this.statement();
-    let elseBranch: Stmt | null = null;
+    this.consume(TokenType.LBRACE, "expect '{' after 'if' condition.");
+    const thenBranch = this.block();
+
+    let elseBranch: Array<Stmt> | null = null;
     if (this.match(TokenType.ELSE)) {
-      elseBranch = this.statement();
+      this.consume(TokenType.LBRACE, "expect '{' after 'else'.");
+      elseBranch = this.block();
     }
 
     return new Stmt.If(condition, thenBranch, elseBranch);
@@ -286,13 +289,23 @@ export class Parser {
   }
 
   private block(): Array<Stmt> {
+    // { ... }
+    // ^
+    // (consumed TokenType.LBRACE)
+
     const statements: Array<Stmt> = [];
 
+    // Until no `}` is found, we keep parsing statements.
+    // { ... }
+    //   ^^^
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
       statements.push(this.declaration());
     }
 
-    this.consume(TokenType.RBRACE, "expect '}' after block.");
+    // { ... }
+    //       ^
+    this.consume(TokenType.RBRACE, "expect '}' after block");
+
     return statements;
   }
 

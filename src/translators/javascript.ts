@@ -266,6 +266,33 @@ export class TranslatorJS {
 
       return head + "\n" + body.join("\n") + "\n" + this.indent() + "}";
     }
+    else if (statement instanceof Stmt.If) {
+      const condition = this.visit(statement.condition);
+
+      this._indentDepth++;
+
+      const thenBody = statement.thenBranch.map(statement => this.appendSemiColon(
+        this.indent() + this.visit(statement)
+      ));
+
+      this._indentDepth--;
+
+      let output = `if (${condition}) {\n` + thenBody.join("\n") + "\n" + this.indent() + "}";
+
+      if (statement.elseBranch) {
+        this._indentDepth++;
+
+        const elseBody = statement.elseBranch.map(statement => this.appendSemiColon(
+          this.indent() + this.visit(statement)
+        ));
+
+        this._indentDepth--;
+
+        output += "\n" + this.indent() + "else {\n" + elseBody.join("\n") + "\n" + this.indent() + "}";
+      }
+
+      return output;
+    }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
   }
