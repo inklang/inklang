@@ -73,7 +73,7 @@ export class TranslatorRust {
   }
 
   private appendSemiColon (output: string): string {
-    if (output.trim().endsWith("}"))  {
+    if (output.trim().startsWith("for"))  {
       return output;
     }
 
