@@ -133,32 +133,40 @@ export class Parser {
 
   /**
    * <pre>
-   * for <identifier> in <expression> {}
-   * for <identifier> from <expression> to <expression> {}
+   * for <identifier>: <type> in <expression> {}
+   * for <identifier>: <type> from <expression> to <expression> {}
    * </pre>
    */
   private forStatement (): Stmt {
-    // for <identifier> in <expression> {}
+    // for <identifier>: <type> in <expression> {}
     // ^^^
     // (consumed TokenType.FOR)
 
-    // for <identifier> in <expression> {}
+    // for <identifier>: <type> in <expression> {}
     //    ^^^^^^^^^^^^^
     const identifier = this.consume(TokenType.IDENTIFIER, "expect variable name.");
 
-    // for <identifier> in <expression> {}
-    //                  ^^
+    // for <identifier>: <type> in <expression> {}
+    //                 ^
+    this.consume(TokenType.COLON, "expect ':' after variable name.");
+
+    // for <identifier>: <type> in <expression> {}
+    //                   ^^^^^^
+    const type = this.type();
+
+    // for <identifier>: <type> in <expression> {}
+    //                          ^^
     this.consume(TokenType.IN, "expect 'in' after variable name.");
 
-    // for <identifier> in <expression> {}
-    //                     ^^^^^^^^^^^^
+    // for <identifier>: <type> in <expression> {}
+    //                             ^^^^^^^^^^^^
     const expression = this.expression();
 
-    // for <identifier> in <expression> {}
-    //                                  ^
+    // for <identifier>: <type> in <expression> {}
+    //                                          ^
     this.consume(TokenType.LBRACE, "expect '{' after 'for'.");
 
-    return new For(identifier, expression, this.block());
+    return new For(identifier, expression, type, this.block());
   }
 
   private ifStatement (): Stmt {

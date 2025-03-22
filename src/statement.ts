@@ -83,6 +83,7 @@ export class For extends Stmt {
   public constructor (
     public readonly identifier: Token,
     public readonly iterable: Expr,
+    public readonly type: Token | AnnotationExpr,
     public readonly body: Array<Stmt>,
   ) { super() }
 }
