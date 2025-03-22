@@ -39,6 +39,12 @@ export class TranslatorKotlin {
       case "f64":
         type = "Double";
         break;
+      case "u64":
+        type = "ULong";
+        break;
+      case "i64":
+        type = "Long";
+        break;
       case "string":
         type = "String";
         break;
