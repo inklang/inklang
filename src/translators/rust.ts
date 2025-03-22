@@ -32,12 +32,13 @@ export class TranslatorRust {
     let type: string;
 
     switch (lexeme) {
-      case "u16":
-      case "u32":
       case "i16":
+      case "u16":
       case "i32":
+      case "u32":
       case "f32":
       case "f64":
+      case "u64":
         type = lexeme;
         break;
       case "boolean":
