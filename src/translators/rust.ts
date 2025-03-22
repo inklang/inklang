@@ -1,8 +1,14 @@
-import { camelCase, pascalCase, snakeCase } from "change-case";
+import { pascalCase, snakeCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
-import Stmt, { For, Function, RecordField, RecordStmt, Variable } from "../statement";
+import Stmt, { For, Function, RecordStmt, Variable } from "../statement";
 import { Token } from "../token";
+import Scope from "./helpers/scope";
+
+enum RustScopeType {
+  FUNCTION_TYPE = "fn",
+  RECORD_TYPE = "record",
+}
 
 export class TranslatorRust {
   public constructor (
@@ -19,6 +25,8 @@ export class TranslatorRust {
 
     return statements.join("\n");
   }
+
+  private scope: Scope = new Scope();
 
   private type (lexeme: string): string {
     let type: string;
@@ -74,6 +82,7 @@ export class TranslatorRust {
 
   private visit (statement: Stmt): string {
     if (statement instanceof Function) {
+
       const head: string[] = [];
 
       if (statement.exposed)
@@ -82,10 +91,19 @@ export class TranslatorRust {
       if (statement.async)
         head.push("async");
 
-      head.push("fn", snakeCase(statement.name.lexeme));
+      const name = snakeCase(statement.name.lexeme);
+      this.scope.define(name, RustScopeType.FUNCTION_TYPE);
+      this.scope = new Scope(this.scope);
+      head.push("fn", name);
 
       const args = statement.params.map(
-        (param) => `${snakeCase(param.name.lexeme)}: ${this.typeIdentifierOrAnnotation(param.type)}`
+        (param) => {
+          const name = snakeCase(param.name.lexeme);
+          const type = this.typeIdentifierOrAnnotation(param.type);
+          this.scope.define(name, this.typeIdentifierOrAnnotation(param.type));
+
+          return `mut ${name}: ${type}`
+        }
       ).join(", ");
 
       const returnType = this.typeIdentifierOrAnnotation(statement.returnType);
@@ -97,14 +115,20 @@ export class TranslatorRust {
       ));
 
       this._indentDepth--;
-
+      this.scope = this.scope.parent!;
       return signature + " {\n" + body.join("\n") + "\n}";
     }
     else if (statement instanceof Variable) {
+      const name = snakeCase(statement.name.lexeme);
+      const type = this.typeIdentifierOrAnnotation(statement.type);
+
       // We always `mut` the variable, just in case.
       // Anyway, `clippy` will automatically fix it during the `generate` command.
-      let output = `let mut ${snakeCase(statement.name.lexeme)}`;
-      output += `: ${this.typeIdentifierOrAnnotation(statement.type)}`;
+      let output = `let mut ${name}`;
+      output += `: ${type}`;
+
+      // We need to keep track of the variables in the function scope.
+      this.scope.define(name, type);
 
       if (statement.initializer)
         output += ` = ${this.visit(statement.initializer)}`;
@@ -138,7 +162,29 @@ export class TranslatorRust {
       return `${left} ${operator} ${right}`;
     }
     else if (statement instanceof Expr.Variable) {
-      return snakeCase(statement.name.lexeme);
+      const name = snakeCase(statement.name.lexeme);
+
+      if (this.scope.resolve(name)) {
+        const type = this.scope.typeOf(name);
+
+        switch (type) {
+          // let mut something = "something".to_string();
+          // let mut definition = HelloWorld {
+          //   hello: something,
+          //   world: something
+          // };
+          //
+          // This is not what we want, because `hello`
+          // borrows the value of `something` and we
+          // cannot borrow it again.
+          //
+          // We need to clone the value of `something`.
+          case "String":
+            return `${name}.clone()`;
+        }
+      }
+
+      return name;
     }
     else if (statement instanceof RecordStmt) {
       this.records.add(statement.name.lexeme);
@@ -149,7 +195,9 @@ export class TranslatorRust {
       if (statement.exposed)
         head.push("pub");
 
-      head.push("struct", pascalCase(statement.name.lexeme));
+      const name = pascalCase(statement.name.lexeme);
+      this.scope.define(name, RustScopeType.RECORD_TYPE);
+      head.push("struct", name);
 
       this._indentDepth++;
 
@@ -191,36 +239,8 @@ export class TranslatorRust {
       let output = pascalCase(statement.name.lexeme) + " {\n";
       this._indentDepth++;
 
-      const fieldsValue = statement.fields.map(field => this.visit(field.value));
       for (const field of statement.fields) {
-        let value = fieldsValue.shift()!;
-
-        // We're preventing a very specific case right here.
-        //
-        // var something: string = "hello";
-        // var definition: a_record = a_record {
-        //   hello: something,
-        //   world: something
-        // };
-        //
-        // In this case, the following code will be generated:
-        //
-        // let mut something = "hello";
-        // let mut definition = ARecord {
-        //   hello: something,
-        //   world: something
-        // };
-        //
-        // This is not what we want, we want to clone the value
-        // because `hello` borrows the value of `something`
-        // and we cannot borrow it again.
-        //
-        // We want to clone the value of `something`.
-        //
-        if (fieldsValue.includes(value)) {
-          value += ".clone()";
-        }
-
+        const value = this.visit(field.value);
         output += this.indent() + `${snakeCase(field.name.lexeme)}: ${value},\n`;
       }
 
@@ -230,7 +250,11 @@ export class TranslatorRust {
       return output;
     }
     else if (statement instanceof For) {
-      const head = `for mut ${snakeCase(statement.identifier.lexeme)} in ${this.visit(statement.iterable)} {`;
+      const variableName = snakeCase(statement.identifier.lexeme);
+      this.scope = new Scope(this.scope);
+      this.scope.define(variableName, this.typeIdentifierOrAnnotation(statement.type));
+
+      const head = `for mut ${variableName} in ${this.visit(statement.iterable)} {`;
 
       this._indentDepth++;
       const body = statement.body.map(statement => this.appendSemiColon(
@@ -238,7 +262,7 @@ export class TranslatorRust {
       ));
 
       this._indentDepth--;
-
+      this.scope = this.scope.parent!;
       return head + "\n" + body.join("\n") + "\n" + this.indent() + "}";
     }
 
