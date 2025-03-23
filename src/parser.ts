@@ -1,5 +1,5 @@
-import Expr, { AnnotationExpr, RecordFieldExpr, RecordInstanciationExpr } from "./expression";
-import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While, For } from "./statement";
+import Expr, { AnnotationExpr, EnumFieldExpr, RecordFieldExpr, RecordInstanciationExpr } from "./expression";
+import Stmt, { Function, FunctionParameter, RecordStmt, RecordField, Variable, While, For, EnumField, Enum } from "./statement";
 import { Token, TokenType } from "./token";
 
 export class Parser {
@@ -37,6 +37,51 @@ export class Parser {
     return this.assignment();
   }
 
+  /**
+   *
+   * <pre>
+   * enum <identifier> {
+   *   ...<identifier> = <expression>
+   * }
+   * </pre>
+   */
+  private enumDeclaration (exposed: boolean): Expr {
+    // enum <identifier> {
+    // ^^^^
+    // (consumed TokenType.ENUM)
+
+    // enum <identifier> {
+    //      ^^^^^^^^^^^^
+    const name = this.consume(TokenType.IDENTIFIER, "expect enum name");
+
+    // enum <identifier> {
+    //                   ^
+    this.consume(TokenType.LBRACE, "expected '{' for enum declaration");
+
+    const fields: Array<EnumField> = [];
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      // name = value,
+      // ^^^^
+      const name = this.consume(TokenType.IDENTIFIER, "expected identifier for enum name");
+
+      // name = value,
+      //      ^
+      this.consume(TokenType.EQUAL, "expected equal for enum value");
+
+      // name = value,
+      //        ^^^^^
+      const value = this.expression();
+
+      fields.push(new EnumFieldExpr(name, value));
+    }
+
+    // }
+    // ^
+    this.consume(TokenType.RBRACE, "expected '}' after enum declaration");
+
+    return new Enum(name, fields, exposed);
+  }
+
   private recordInstantiation (): Expr {
     const name = this.consume(TokenType.IDENTIFIER, "expected identifier for record instanciation.");
     this.consume(TokenType.LBRACE, "expected '{' for record instanciation.");
@@ -65,14 +110,18 @@ export class Parser {
     }
 
     if (async)
-      throw this.error(this.peek(), "only functions can be async.");
+      throw this.error(this.peek(), "only functions can be async");
 
     if (this.match(TokenType.RECORD)) {
       return this.recordDeclaration(exposed);
     }
 
+    if (this.match(TokenType.ENUM)) {
+      return this.enumDeclaration(exposed);
+    }
+
     if (exposed || async)
-      throw this.error(this.peek(), "only functions and records can be exposed.");
+      throw this.error(this.peek(), "only functions, records and enums can be exposed");
 
     if (this.match(TokenType.VAR)) {
       return this.variableDeclaration();
@@ -82,13 +131,13 @@ export class Parser {
   }
 
   private recordDeclaration (exposed: boolean): RecordStmt {
-    const name = this.consume(TokenType.IDENTIFIER, "expect record name.");
-    this.consume(TokenType.LBRACE, "expect '{' after record name.");
+    const name = this.consume(TokenType.IDENTIFIER, "expect record name");
+    this.consume(TokenType.LBRACE, "expect '{' after record name");
 
     const fields: Array<RecordField> = [];
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
-      const field = this.consume(TokenType.IDENTIFIER, "expect field name.");
-      this.consume(TokenType.COLON, "expect ':' after field name.");
+      const field = this.consume(TokenType.IDENTIFIER, "expect field name");
+      this.consume(TokenType.COLON, "expect ':' after field name");
 
       // a: int
       //    ^^^
@@ -99,7 +148,7 @@ export class Parser {
       fields.push(new RecordField(field, type));
     }
 
-    this.consume(TokenType.RBRACE, "expect '}' after record fields.");
+    this.consume(TokenType.RBRACE, "expect '}' after record fields");
     return new RecordStmt(name, fields, exposed);
   }
 
@@ -107,15 +156,19 @@ export class Parser {
     if (this.match(TokenType.FOR)) {
       return this.forStatement();
     }
+
     if (this.match(TokenType.IF)) {
       return this.ifStatement();
     }
+
     if (this.match(TokenType.RETURN)) {
       return this.returnStatement();
     }
+
     if (this.match(TokenType.WHILE)) {
       return this.whileStatement();
     }
+
     if (this.match(TokenType.LBRACE)) {
       return new Stmt.Block(this.block());
     }

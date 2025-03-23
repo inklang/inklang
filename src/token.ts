@@ -50,6 +50,7 @@ export enum TokenType {
   IN,
   FROM,
   TO,
+  ENUM,
 
   EOF
 }

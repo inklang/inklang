@@ -90,6 +90,13 @@ export class RecordFieldExpr extends Expr {
   ) { super() }
 }
 
+export class EnumFieldExpr extends Expr {
+  public constructor (
+    public readonly name: Token,
+    public readonly value: Expr,
+  ) { super() }
+}
+
 export class RecordInstanciationExpr extends Expr {
   public constructor (
     public readonly name: Token,

@@ -13,6 +13,7 @@ export class Scanner {
     ["var", TokenType.VAR],
     ["record", TokenType.RECORD],
     ["function", TokenType.FUNCTION],
+    ["enum", TokenType.ENUM],
 
     // Visibility
     ["public", TokenType.PUBLIC],

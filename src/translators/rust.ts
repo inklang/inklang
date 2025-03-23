@@ -1,13 +1,14 @@
 import { pascalCase, snakeCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
-import Stmt, { For, Function, RecordStmt, Variable } from "../statement";
+import Stmt, { Enum, For, Function, RecordStmt, Variable } from "../statement";
 import { Token } from "../token";
 import Scope from "./helpers/scope";
 
 enum RustScopeType {
   FUNCTION_TYPE = "fn",
   RECORD_TYPE = "record",
+  ENUM_TYPE = "enum",
 }
 
 export class TranslatorRust {
@@ -15,7 +16,7 @@ export class TranslatorRust {
     private readonly statements: Array<Stmt>
   ) {}
 
-  private records: Set<string> = new Set();
+  private recordsAndEnums: Set<string> = new Set();
 
   public translate (): string {
     // We start by translating the statements.
@@ -51,7 +52,7 @@ export class TranslatorRust {
         type = "()";
         break;
       default: {
-        if (this.records.has(lexeme)) {
+        if (this.recordsAndEnums.has(lexeme)) {
           type = pascalCase(lexeme);
         }
         else throw new Error(`unknown variable type '${lexeme}'`);
@@ -189,7 +190,7 @@ export class TranslatorRust {
       return name;
     }
     else if (statement instanceof RecordStmt) {
-      this.records.add(statement.name.lexeme);
+      this.recordsAndEnums.add(statement.name.lexeme);
 
       const derives = ["Debug", "Clone"];
       const head: string[] = [];
@@ -293,6 +294,38 @@ export class TranslatorRust {
       }
 
       return output;
+    }
+    else if (statement instanceof Enum) {
+      this.recordsAndEnums.add(statement.name.lexeme);
+
+      const derives = ["Debug", "Clone", "PartialEq", "serde::Serialize", "serde::Deserialize"];
+      const head: string[] = [];
+
+      if (statement.exposed)
+        head.push("pub");
+
+      const name = pascalCase(statement.name.lexeme);
+      this.scope.define(name, RustScopeType.ENUM_TYPE);
+      head.push("enum", name);
+
+      this._indentDepth++;
+
+      const fields = statement.fields.map(
+        (field) => {
+          const lines: string[] = [];
+
+          if (field.value instanceof Expr.Literal) {
+            lines.push(`#[serde(rename = ${JSON.stringify(field.value.value)})]`);
+          } else throw new Error(`unknown field value type '${field.value.constructor.name}'`);
+
+          lines.push(`${pascalCase(field.name.lexeme)}`)
+
+          return lines.map(line => this.indent() + line).join("\n");
+        }).join(",\n");
+
+      this._indentDepth--;
+
+      return "#[derive(" + derives.join(", ") + ")]\n" + head.join(" ") + " {\n" + fields + "\n}";
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);

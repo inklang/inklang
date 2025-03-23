@@ -72,6 +72,21 @@ export class RecordField extends Stmt {
   ) { super() }
 }
 
+export class EnumField extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly value: Expr,
+  ) { super() }
+}
+
+export class Enum extends Stmt {
+  public constructor (
+    public readonly name: Token,
+    public readonly fields: Array<EnumField>,
+    public readonly exposed: boolean
+  ) { super() }
+}
+
 export class While extends Stmt {
   public constructor (
     public readonly condition: Expr,

@@ -1,7 +1,7 @@
-import { camelCase, pascalCase } from "change-case";
+import { camelCase, pascalCase, constantCase } from "change-case";
 
 import Expr, { AnnotationExpr, RecordInstanciationExpr } from "../expression";
-import Stmt, { For, Function, RecordField, RecordStmt, Variable } from "../statement";
+import Stmt, { Enum, For, Function, RecordField, RecordStmt, Variable } from "../statement";
 
 export class TranslatorJS {
   public constructor (
@@ -82,7 +82,9 @@ export class TranslatorJS {
   }
 
   private appendSemiColon (output: string): string {
-    if (output.trim().endsWith("}"))  {
+    const trimmed = output.trim();
+
+    if (trimmed.startsWith("for") || trimmed.startsWith("if")) {
       return output;
     }
 
@@ -289,6 +291,37 @@ export class TranslatorJS {
         this._indentDepth--;
 
         output += "\n" + this.indent() + "else {\n" + elseBody.join("\n") + "\n" + this.indent() + "}";
+      }
+
+      return output;
+    }
+    else if (statement instanceof Enum) {
+      const head: string[] = [];
+
+      if (statement.exposed && this.type === "mjs")
+        head.push("export");
+
+      const name = pascalCase(statement.name.lexeme);
+      head.push("const", name);
+
+      this._indentDepth++;
+
+      const fields = statement.fields.map(
+        (field) => {
+          if (!(field.value instanceof Expr.Literal)) {
+            throw new Error(`unknown field value type '${field.value.constructor.name}'`);
+          }
+
+          return this.indent() + `${constantCase(field.name.lexeme)}: ${JSON.stringify(field.value.value)}`;
+        }).join(",\n");
+
+      this._indentDepth--;
+
+      // We manually add the semi-colon because it's a top-level statement.
+      const output = this.appendSemiColon(head.join(" ") + " = {\n" + fields + "\n}");
+
+      if (statement.exposed && this.type === "cjs") {
+        return output + this.appendSemiColon(`\nexports.${name} = ${name}`);
       }
 
       return output;

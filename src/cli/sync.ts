@@ -271,6 +271,7 @@ edition = "2021"
 path = "generated/rust/lib.rs"
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
 ${ink.annotations.map((annotation) =>
   `inklang_${annotation} = { git = "https://github.com/inklang/rust" }`
 ).join("\n")}

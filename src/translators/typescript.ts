@@ -1,7 +1,7 @@
-import { camelCase } from "change-case";
+import { camelCase, constantCase } from "change-case";
 
 import Expr, { AnnotationExpr } from "../expression";
-import Stmt, { Function, RecordStmt, Variable } from "../statement";
+import Stmt, { Enum, Function, RecordStmt, Variable } from "../statement";
 import { pascalCase } from "change-case";
 import { Token } from "../token";
 
@@ -18,7 +18,7 @@ export class TranslatorTS {
    * - See `this.import` for adding new imports.
    */
   private imports: Record<string, Set<string>> = {};
-  private records: Set<string> = new Set();
+  private recordsAndEnums: Set<string> = new Set();
 
   public translate (): string {
     // We cleanup the necessary imports.
@@ -88,7 +88,7 @@ export class TranslatorTS {
         type = lexeme;
         break;
       default: {
-        if (this.records.has(lexeme)) {
+        if (this.recordsAndEnums.has(lexeme)) {
           type = pascalCase(lexeme);
         }
         else throw new Error(`unknown variable type '${lexeme}'`);
@@ -124,7 +124,7 @@ export class TranslatorTS {
       const returnType = this.typeIdentifierOrAnnotation(statement.returnType);
       const signature = head.join(" ") + `: (${args}) => ${statement.async ? `Promise<${returnType}>` : returnType}`;
 
-      return signature + "\n";
+      return signature + ";";
     }
     else if (statement instanceof Variable) {
       return noop;
@@ -133,7 +133,7 @@ export class TranslatorTS {
       return noop;
     }
     else if (statement instanceof RecordStmt) {
-      this.records.add(statement.name.lexeme);
+      this.recordsAndEnums.add(statement.name.lexeme);
 
       const head: string[] = [];
 
@@ -164,6 +164,32 @@ export class TranslatorTS {
     }
     else if (statement instanceof AnnotationExpr) {
       return this.visitAnnotationExpr(statement);
+    }
+    else if (statement instanceof Enum) {
+      this.recordsAndEnums.add(statement.name.lexeme);
+
+      const head: string[] = [];
+
+      if (statement.exposed)
+        head.push("export");
+
+      const name = pascalCase(statement.name.lexeme);
+      head.push("enum", name);
+
+      this._indentDepth++;
+
+      const fields = statement.fields.map(
+        (field) => {
+          if (!(field.value instanceof Expr.Literal)) {
+            throw new Error(`unknown field value type '${field.value.constructor.name}'`);
+          }
+
+          return this.indent() + `${constantCase(field.name.lexeme)} = ${JSON.stringify(field.value.value)}`;
+        }).join(",\n");
+
+      this._indentDepth--;
+
+      return head.join(" ") + " {\n" + fields + "\n}";
     }
 
     throw new Error(`cannot translate '${statement.constructor.name}'`);
